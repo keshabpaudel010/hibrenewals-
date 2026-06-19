@@ -206,14 +206,22 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 <!-- PAGE 2: MONTH VIEW -->
 <div id="page-month" class="page">
   <div class="header"><h1 id="month-title">Month</h1><p>Renewal Targets</p></div>
-  <div class="back-btn" onclick="goHome()">← Back to Months</div>
-  <div class="overview" id="month-overview"></div>
-  <div class="filter-tabs">
-    <div class="tab active" onclick="filterCards('all',this)">All</div>
-    <div class="tab" onclick="filterCards('paid',this)">✅ Paid</div>
-    <div class="tab" onclick="filterCards('unpaid',this)">❌ Not Paid</div>
+  <div class="back-btn" id="month-back-btn" onclick="monthBack()">← Back to Months</div>
+
+  <div id="type-grid-section">
+    <div style="padding:10px 12px 2px;font-size:13px;color:#555;">Select Category:</div>
+    <div class="month-grid" id="type-grid"></div>
   </div>
-  <div class="family-list" id="month-family-list"></div>
+
+  <div id="month-list-section" style="display:none;">
+    <div class="overview" id="month-overview"></div>
+    <div class="filter-tabs">
+      <div class="tab active" onclick="filterCards('all',this)">All</div>
+      <div class="tab" onclick="filterCards('paid',this)">✅ Paid</div>
+      <div class="tab" onclick="filterCards('unpaid',this)">❌ Not Paid</div>
+    </div>
+    <div class="family-list" id="month-family-list"></div>
+  </div>
 </div>
 
 <!-- PAGE 3: FAMILY DETAIL -->
@@ -337,7 +345,7 @@ const MONTHS=[
   {name:"Magh",nep:"माघ"},{name:"Falgun",nep:"फागुन"},{name:"Chaitra",nep:"चैत"},
 ];
 
-let cache={},currentMonth=null,currentFamilies=[],currentFilter="all",currentDetailFam=null,confirmCallback=null;
+let cache={},currentMonth=null,currentFamilies=[],currentFilter="all",currentDetailFam=null,confirmCallback=null,currentTypeFilter=null,monthViewState="types";
 
 // ── TOAST ──
 function showToast(msg){
@@ -501,24 +509,63 @@ function buildMonthGrid(){
 function updateAllBadges(){for(const m of MONTHS)if(cache[m.name])updateMonthBadge(m.name);}
 
 function openMonth(m){
-  currentMonth=m;currentFilter="all";
+  currentMonth=m;currentFilter="all";currentTypeFilter=null;
   document.getElementById("month-title").textContent=`${m.nep} — ${m.name}`;
   currentFamilies=cache[m.name]||[];
-  renderMonthList("all");showPage("page-month");
-  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-  document.querySelector(".filter-tabs .tab").classList.add("active");
+  renderTypeGrid();
+  showMonthView("types");
+  showPage("page-month");
 }
+
+function renderTypeGrid(){
+  const counts={};
+  for(const f of currentFamilies){
+    const t=f.familyType||"Unknown";
+    counts[t]=(counts[t]||0)+1;
+  }
+  const grid=document.getElementById("type-grid");
+  grid.innerHTML="";
+  const types=Object.keys(counts).sort();
+  if(!types.length){grid.innerHTML=`<div class="empty" style="grid-column:span 2">No families found</div>`;return;}
+  for(const t of types){
+    const btn=document.createElement("div");
+    btn.className="month-btn";
+    btn.innerHTML=`<div class="month-nep">${t}</div><div class="month-count">${counts[t]} families</div>`;
+    btn.onclick=()=>openType(t);
+    grid.appendChild(btn);
+  }
+}
+
+function openType(t){
+  currentTypeFilter=t;currentFilter="all";
+  document.querySelectorAll("#month-list-section .tab").forEach(el=>el.classList.remove("active"));
+  document.querySelector("#month-list-section .tab").classList.add("active");
+  renderMonthList("all");
+  showMonthView("list");
+}
+
+function showMonthView(state){
+  monthViewState=state;
+  document.getElementById("type-grid-section").style.display=state==="types"?"":"none";
+  document.getElementById("month-list-section").style.display=state==="list"?"":"none";
+  document.getElementById("month-back-btn").textContent=state==="list"?"← Back to Categories":"← Back to Months";
+}
+
+window.monthBack=function(){
+  if(monthViewState==="list"){renderTypeGrid();showMonthView("types");}
+  else{goHome();}
+};
 
 function renderMonthList(filter){
   currentFilter=filter;
   const list=document.getElementById("month-family-list");
-  let filtered=currentFamilies;
-  if(filter==="paid")filtered=currentFamilies.filter(f=>f.paid);
-  if(filter==="unpaid")filtered=currentFamilies.filter(f=>!f.paid);
-  const total=currentFamilies.length;
-  const paid=currentFamilies.filter(f=>f.paid).length;
+  let filtered=currentFamilies.filter(f=>(f.familyType||"Unknown")===currentTypeFilter);
+  if(filter==="paid")filtered=filtered.filter(f=>f.paid);
+  if(filter==="unpaid")filtered=filtered.filter(f=>!f.paid);
+  const total=filtered.length;
+  const paid=filtered.filter(f=>f.paid).length;
   const unpaid=total-paid;
-  document.getElementById("month-overview").innerHTML=`<strong>${currentMonth.nep}</strong> &nbsp;|&nbsp; Total: <strong>${total}</strong> &nbsp;|&nbsp; ✅ Paid: <strong style="color:#22a05a">${paid}</strong> &nbsp;|&nbsp; ❌ Unpaid: <strong style="color:#e03535">${unpaid}</strong>`;
+  document.getElementById("month-overview").innerHTML=`<strong>${currentMonth.nep} · ${currentTypeFilter}</strong> &nbsp;|&nbsp; Total: <strong>${total}</strong> &nbsp;|&nbsp; ✅ Paid: <strong style="color:#22a05a">${paid}</strong> &nbsp;|&nbsp; ❌ Unpaid: <strong style="color:#e03535">${unpaid}</strong>`;
   if(!filtered.length){list.innerHTML=`<div class="empty">No families found</div>`;return;}
   list.innerHTML="";
   for(const fam of filtered){
@@ -735,7 +782,7 @@ window.closeHomeQR=function(){
 window.handleAndroidBack=function(){
   const p=document.querySelector('.page.active');
   if(p&&p.id==='page-detail'){goMonth();return true;}
-  if(p&&p.id==='page-month'){goHome();return true;}
+  if(p&&p.id==='page-month'){monthBack();return true;}
   return false;
 };
 </script>
