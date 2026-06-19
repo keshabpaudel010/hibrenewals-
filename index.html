@@ -53,7 +53,10 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 .tab.active { background: #1a3a6b; color: white; border-color: #1a3a6b; }
 
 .family-list { padding: 0 12px 20px; }
-.family-card { background: white; border-radius: 8px; margin-bottom: 10px; padding: 12px 14px; border-left: 4px solid #ccc; cursor: pointer; display: flex; align-items: center; gap: 12px; }
+.swipe-wrapper { position: relative; overflow: hidden; border-radius: 8px; margin-bottom: 10px; }
+.swipe-delete-btn { position: absolute; top: 0; right: 0; height: 100%; width: 76px; background: #e03535; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; z-index: 1; gap: 2px; }
+.swipe-delete-btn span:first-child { font-size: 18px; }
+.family-card { background: white; border-radius: 8px; margin-bottom: 0; padding: 12px 14px; border-left: 4px solid #ccc; cursor: pointer; display: flex; align-items: center; gap: 12px; position: relative; z-index: 2; transition: transform 0.18s ease; }
 .family-card.paid { border-left-color: #22a05a; }
 .family-card.unpaid { border-left-color: #e03535; }
 .family-photo { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: #eee; flex-shrink: 0; border: 1px solid #ddd; }
@@ -82,7 +85,8 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 .dbadge-type { background: #f0fdf4; color: #166534; }
 
 .members-title { padding: 10px 12px 4px; font-size: 13px; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
-.member-row { background: white; margin: 4px 12px; border-radius: 6px; padding: 10px 12px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.swipe-wrapper-member { position: relative; overflow: hidden; margin: 4px 12px; border-radius: 6px; }
+.member-row { background: white; margin: 0; border-radius: 6px; padding: 10px 12px; font-size: 13px; display: flex; align-items: center; gap: 10px; position: relative; z-index: 2; transition: transform 0.18s ease; }
 .member-photo { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #eee; flex-shrink: 0; border: 1px solid #ddd; cursor: pointer; }
 .member-photo-placeholder { width: 44px; height: 44px; border-radius: 50%; background: #eee; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
 .member-info { flex: 1; }
@@ -361,6 +365,133 @@ function showSyncBar(show){
   show?b.classList.add("show"):b.classList.remove("show");
 }
 
+// ── SWIPE-LEFT-TO-DELETE ──
+let openSwipeContent=null,openSwipeWrapper=null;
+function closeAllSwipes(){
+  if(openSwipeContent){openSwipeContent.style.transform="translateX(0)";}
+  if(openSwipeWrapper)openSwipeWrapper.dataset.open="0";
+  openSwipeContent=null;openSwipeWrapper=null;
+}
+function attachSwipe(wrapperEl,contentEl,revealPx,onTap){
+  let startX=0,startY=0,deltaX=0,dragging=false,horizontal=false;
+  contentEl.addEventListener("touchstart",e=>{
+    startX=e.touches[0].clientX;startY=e.touches[0].clientY;deltaX=0;dragging=true;horizontal=false;
+  },{passive:true});
+  contentEl.addEventListener("touchmove",e=>{
+    if(!dragging)return;
+    const dx=e.touches[0].clientX-startX;
+    const dy=e.touches[0].clientY-startY;
+    if(!horizontal&&Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy))horizontal=true;
+    if(horizontal){
+      deltaX=dx;
+      const base=wrapperEl.dataset.open==="1"?-revealPx:0;
+      let t=base+dx;
+      if(t>0)t=0;if(t<-revealPx)t=-revealPx;
+      contentEl.style.transform=`translateX(${t}px)`;
+      e.preventDefault();
+    }
+  },{passive:false});
+  contentEl.addEventListener("touchend",()=>{
+    dragging=false;
+    if(!horizontal){
+      return; // plain tap/scroll — let normal click handler run
+    }
+    const wasOpen=wrapperEl.dataset.open==="1";
+    const finalDelta=(wasOpen?-revealPx:0)+deltaX;
+    if(finalDelta<-(revealPx/2)){
+      if(openSwipeContent&&openSwipeContent!==contentEl)closeAllSwipes();
+      contentEl.style.transform=`translateX(-${revealPx}px)`;
+      wrapperEl.dataset.open="1";
+      openSwipeContent=contentEl;openSwipeWrapper=wrapperEl;
+    }else{
+      contentEl.style.transform="translateX(0)";
+      wrapperEl.dataset.open="0";
+      if(openSwipeContent===contentEl){openSwipeContent=null;openSwipeWrapper=null;}
+    }
+  });
+  contentEl.addEventListener("click",e=>{
+    if(wrapperEl.dataset.open==="1"){
+      e.stopPropagation();e.preventDefault();
+      closeAllSwipes();
+    }
+  },true);
+}
+
+// ── PERMANENT DELETE ──
+function confirmDeleteFamily(fam){
+  showConfirm(
+    "⚠️ Delete Family Permanently?",
+    `"${fam.headName}" and all ${fam.memberCount||0} members will be PERMANENTLY deleted.\n\nThis cannot be undone, and this family will never be re-uploaded again, even if it appears in a future scraped file.\n\nAre you sure?`,
+    ()=>permanentlyDeleteFamily(fam)
+  );
+}
+
+async function permanentlyDeleteFamily(fam){
+  showSyncBar(true);
+  try{
+    await deleteDoc(doc(db,"months",fam.nepaliMonth,"families",fam.headId));
+    await setDoc(doc(db,"deletedFamilies",fam.headId),{
+      insuranceNo: fam.headId,
+      headName: fam.headName||"",
+      deletedFromMonth: fam.nepaliMonth||""
+    });
+    if(cache[fam.nepaliMonth])cache[fam.nepaliMonth]=cache[fam.nepaliMonth].filter(f=>f.headId!==fam.headId);
+    updateMonthBadge(fam.nepaliMonth);
+    saveToLocal();
+    showSyncBar(false);
+    showToast("🗑️ Family permanently deleted");
+    if(document.getElementById("search-results").style.display==="block"){
+      handleSearch(document.getElementById("search-input").value);
+    }else{
+      renderTypeGrid();
+      if(monthViewState==="list")renderMonthList(currentFilter);
+    }
+  }catch(e){
+    showSyncBar(false);
+    showToast("❌ Error: "+e.message);
+  }
+}
+
+function confirmDeleteMember(fam,member,isHead){
+  if(isHead){
+    showToast("⚠️ To remove the head, delete the whole family instead");
+    return;
+  }
+  showConfirm(
+    "⚠️ Delete Member Permanently?",
+    `"${member.name}" will be PERMANENTLY removed from this family.\n\nThis cannot be undone, and they will never be re-added again, even if they appear in a future scraped file.\n\nAre you sure?`,
+    ()=>permanentlyDeleteMember(fam,member)
+  );
+}
+
+async function permanentlyDeleteMember(fam,member){
+  showSyncBar(true);
+  try{
+    const remaining=(fam.members||[]).filter(m=>m.id!==member.id);
+    await updateDoc(doc(db,"months",fam.nepaliMonth,"families",fam.headId),{
+      members: remaining,
+      memberCount: remaining.length
+    });
+    await setDoc(doc(db,"deletedMembers",member.id),{
+      insuranceNo: member.id,
+      name: member.name||"",
+      deletedFromFamily: fam.headId||""
+    });
+    fam.members=remaining;fam.memberCount=remaining.length;
+    if(cache[fam.nepaliMonth]){
+      const idx=cache[fam.nepaliMonth].findIndex(f=>f.headId===fam.headId);
+      if(idx!==-1)cache[fam.nepaliMonth][idx]=fam;
+    }
+    saveToLocal();
+    showSyncBar(false);
+    showToast("🗑️ Member permanently deleted");
+    openDetail(fam);
+  }catch(e){
+    showSyncBar(false);
+    showToast("❌ Error: "+e.message);
+  }
+}
+
 // ── CONFIRM ──
 function showConfirm(title,msg,onConfirm){
   document.getElementById("confirm-title").textContent=title;
@@ -588,7 +719,18 @@ function renderMonthList(filter){
     card.onclick=()=>openDetail(fam);
     const checkEl=card.querySelector(".paid-check");
     checkEl.onclick=(e)=>{e.stopPropagation();handlePaidClick(fam,checkEl);};
-    list.appendChild(card);
+
+    const wrapper=document.createElement("div");
+    wrapper.className="swipe-wrapper";
+    wrapper.dataset.open="0";
+    const delBtn=document.createElement("div");
+    delBtn.className="swipe-delete-btn";
+    delBtn.innerHTML=`<span>🗑️</span><span>Delete</span>`;
+    delBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmDeleteFamily(fam);};
+    wrapper.appendChild(delBtn);
+    wrapper.appendChild(card);
+    attachSwipe(wrapper,card,76);
+    list.appendChild(wrapper);
   }
 }
 
@@ -629,7 +771,19 @@ function openDetail(fam){
         <div class="m-id">${m.id||""}</div>
       </div>
       <div class="m-phone" onclick="copyPhone('${m.phone||''}')">${m.phone||"—"}</div>`;
-    membersList.appendChild(row);
+
+    const mwrapper=document.createElement("div");
+    mwrapper.className="swipe-wrapper-member";
+    mwrapper.dataset.open="0";
+    const mDelBtn=document.createElement("div");
+    mDelBtn.className="swipe-delete-btn";
+    mDelBtn.style.width="64px";
+    mDelBtn.innerHTML=`<span>🗑️</span>`;
+    mDelBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmDeleteMember(fam,m,isHead);};
+    mwrapper.appendChild(mDelBtn);
+    mwrapper.appendChild(row);
+    attachSwipe(mwrapper,row,64);
+    membersList.appendChild(mwrapper);
   }
   const historySection=document.getElementById("enrol-history-section");
   const history=fam.enrolHistory||[];
@@ -747,7 +901,18 @@ window.handleSearch=async function(query){
     card.onclick=()=>openDetail(fam);
     const checkEl=card.querySelector(".paid-check");
     checkEl.onclick=(e)=>{e.stopPropagation();handlePaidClick(fam,checkEl);};
-    listEl.appendChild(card);
+
+    const wrapper=document.createElement("div");
+    wrapper.className="swipe-wrapper";
+    wrapper.dataset.open="0";
+    const delBtn=document.createElement("div");
+    delBtn.className="swipe-delete-btn";
+    delBtn.innerHTML=`<span>🗑️</span><span>Delete</span>`;
+    delBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmDeleteFamily(fam);};
+    wrapper.appendChild(delBtn);
+    wrapper.appendChild(card);
+    attachSwipe(wrapper,card,76);
+    listEl.appendChild(wrapper);
   }
 };
 
