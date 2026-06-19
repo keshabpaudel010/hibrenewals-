@@ -325,7 +325,7 @@ const BS_DATA = {
   2090:[31,31,32,31,31,31,30,29,30,29,30,30],
 };
 const NEPALI_MONTHS=["Baishakh","Jestha","Ashadh","Shrawan","Bhadra","Ashwin","Kartik","Mangsir","Poush","Magh","Falgun","Chaitra"];
-const BS_EPOCH=new Date(1943,3,14);
+const BS_EPOCH=new Date(1943,3,8); // calibrated: verified against confirmed ground truth (Ashadh 5, 2083 = 19 Jun 2026)
 function adToBS(d){
   let t=Math.floor((d-BS_EPOCH)/86400000);
   for(let y=2000;y<=2090;y++){
@@ -790,4 +790,3 @@ window.handleAndroidBack=function(){
 </script>
 </body>
 </html>
-
