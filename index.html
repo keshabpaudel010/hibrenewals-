@@ -399,6 +399,21 @@ const MONTHS=[
   {name:"Kartik",nep:"कार्तिक"},{name:"Mangsir",nep:"मंसिर"},{name:"Poush",nep:"पुष"},
   {name:"Magh",nep:"माघ"},{name:"Falgun",nep:"फागुन"},{name:"Chaitra",nep:"चैत"},
 ];
+function monthNep(englishName){
+  const m=MONTHS.find(x=>x.name===englishName);
+  return m?m.nep:(englishName||"");
+}
+function adStringToBS(str){
+  if(!str)return "";
+  const parts=str.split("/");
+  if(parts.length!==3)return str;
+  const d=parseInt(parts[0],10),m=parseInt(parts[1],10),y=parseInt(parts[2],10);
+  if(!d||!m||!y)return str;
+  const date=new Date(y,m-1,d);
+  const bs=adToBS(date);
+  if(!bs)return str;
+  return `${bs.day} ${monthNep(bs.monthName)} ${bs.year}`;
+}
 
 let cache={},currentMonth=null,currentFamilies=[],currentFilter="all",currentDetailFam=null,confirmCallback=null,currentTypeFilter=null,monthViewState="types";
 
@@ -562,7 +577,7 @@ function selectMoveMonth(newMonth,newMonthNep){
   if(newMonth===fam.nepaliMonth){showToast("Already in that month");return;}
   showConfirm(
     "📅 Move Family?",
-    `Move "${fam.headName}" from ${fam.nepaliMonth} to ${newMonthNep}?`,
+    `Move "${fam.headName}" from ${monthNep(fam.nepaliMonth)} to ${newMonthNep}?`,
     ()=>moveFamilyToMonth(fam,newMonth)
   );
 }
@@ -583,7 +598,7 @@ async function moveFamilyToMonth(fam,newMonth){
     updateMonthBadge(oldMonth);updateMonthBadge(newMonth);
     saveToLocal();
     showSyncBar(false);
-    showToast(`✅ Moved to ${newMonth}`);
+    showToast(`✅ Moved to ${monthNep(newMonth)}`);
     if(document.getElementById("search-results").style.display==="block"){
       performSearch(document.getElementById("search-input").value);
     }else if(currentMonth&&currentMonth.name===oldMonth){
@@ -989,9 +1004,9 @@ function openDetail(fam){
       <div class="detail-info">
         <div class="detail-name">${fam.headName||""}</div>
         <div class="detail-meta">ID: ${fam.headId||""}</div>
-        <div class="detail-meta">Registered: ${fam.registrationDateAD||""}</div>
+        <div class="detail-meta">Registered: ${adStringToBS(fam.registrationDateAD)}</div>${fam.registrationDateAD?`<div class="detail-meta" style="font-size:11px;color:#999;">(${fam.registrationDateAD} AD)</div>`:""}
         <div class="detail-badges">
-          <span class="dbadge dbadge-month">📅 ${fam.nepaliMonth||""} ${fam.bsYear||""}</span>
+          <span class="dbadge dbadge-month">📅 ${monthNep(fam.nepaliMonth)} ${fam.bsYear||""}</span>
           <span class="dbadge dbadge-type">${fam.familyType||"Normal"}</span>
           ${!isCurrentMonth?`<span class="dbadge" style="background:#fff3cd;color:#856404;">⚠️ Late payment</span>`:""}
         </div>
@@ -1032,7 +1047,7 @@ function openDetail(fam){
   if(history.length){
     let rows="";
     history.forEach((h,i)=>{
-      rows+=`<tr><td>${i+1}</td><td>${h.date||""}</td><td>${h.assistant||""}</td></tr>`;
+      rows+=`<tr><td>${i+1}</td><td>${adStringToBS(h.date)}</td><td>${h.assistant||""}</td></tr>`;
     });
     historySection.innerHTML=`
       <div class="history-title">📋 ENROLMENT HISTORY</div>
@@ -1050,7 +1065,7 @@ window.handlePaidClick=function(fam,checkEl){
   const newPaid=!fam.paid;
   const isLate=fam.nepaliMonth!==currentNepaliMonth;
   if(newPaid&&isLate){
-    showConfirm("⚠️ Move Family?",`"${fam.headName}" was in ${fam.nepaliMonth} but not paid.\n\nWill move to ${currentNepaliMonth} and mark paid.\n\nAre you sure?`,()=>doTogglePaid(fam,checkEl));
+    showConfirm("⚠️ Move Family?",`"${fam.headName}" was in ${monthNep(fam.nepaliMonth)} but not paid.\n\nWill move to ${monthNep(currentNepaliMonth)} and mark paid.\n\nAre you sure?`,()=>doTogglePaid(fam,checkEl));
     return;
   }
   doTogglePaid(fam,checkEl);
@@ -1072,7 +1087,7 @@ async function doTogglePaid(fam,checkEl){
       const bs=adToBS(today);
       const updatedFam={...fam,paid:true,paidDate,nepaliMonth:currentNepaliMonth,bsYear:bs?bs.year:fam.bsYear,registrationDateAD:todayStr};
       delete updatedFam.id;
-      setDoc(newRef,updatedFam).then(()=>deleteDoc(oldRef)).then(()=>{showSyncBar(false);showToast(`✅ Moved to ${currentNepaliMonth}!`);}).catch(e=>{showSyncBar(false);showToast("❌ Error: "+e.message);});
+      setDoc(newRef,updatedFam).then(()=>deleteDoc(oldRef)).then(()=>{showSyncBar(false);showToast(`✅ Moved to ${monthNep(currentNepaliMonth)}!`);}).catch(e=>{showSyncBar(false);showToast("❌ Error: "+e.message);});
       if(cache[oldMonth])cache[oldMonth]=cache[oldMonth].filter(f=>f.headId!==fam.headId);
       if(!cache[currentNepaliMonth])cache[currentNepaliMonth]=[];
       const newFamObj={...updatedFam,id:fam.headId};
@@ -1130,7 +1145,14 @@ window.performSearch=function(query){
   const q=query.toLowerCase();const results=[];
   for(const m of MONTHS){
     for(const fam of(cache[m.name]||[])){
-      if((fam.headName||"").toLowerCase().includes(q)||(fam.headId||"").includes(q)||(fam.members||[]).some(mem=>(mem.name||"").toLowerCase().includes(q)||(mem.phone||"").includes(q)||(mem.id||"").includes(q)))results.push(fam);
+      let matched=null;
+      if((fam.headName||"").toLowerCase().includes(q)||(fam.headId||"").includes(q)){
+        matched=(fam.members||[]).find(mm=>mm.id===fam.headId)||{id:fam.headId,name:fam.headName,photoUrl:fam.headPhotoUrl||""};
+      }
+      if(!matched){
+        matched=(fam.members||[]).find(mem=>(mem.name||"").toLowerCase().includes(q)||(mem.phone||"").includes(q)||(mem.id||"").includes(q));
+      }
+      if(matched)results.push({fam,matched});
     }
   }
   document.getElementById("search-count").textContent=`${results.length} result(s) found`;
@@ -1138,16 +1160,16 @@ window.performSearch=function(query){
   if(!results.length){listEl.innerHTML=`<div class="empty">No results</div>`;return;}
   const LIMIT=60;
   const shown=results.slice(0,LIMIT);
-  for(const fam of shown){
-    const headMember=(fam.members||[]).find(m=>m.id===fam.headId)||(fam.members||[])[0];
-    const photoUrl=headMember?.photoUrl||"";const isPaid=fam.paid||false;
+  for(const {fam,matched} of shown){
+    const isHeadMatch=matched.id===fam.headId;
+    const photoUrl=matched.photoUrl||"";const isPaid=fam.paid||false;
     const card=document.createElement("div");card.className=`family-card ${isPaid?"paid":"unpaid"}`;
     card.innerHTML=`
       ${photoUrl?`<img class="family-photo" src="${photoUrl}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ""}
       <div class="family-photo-placeholder" ${photoUrl?'style="display:none"':""}>👤</div>
       <div class="card-info">
-        <div class="card-top"><div class="family-name">${fam.headName||""}${fam.ignored?' <span style="color:#888;font-size:11px;">(Ignored)</span>':""}</div><div class="paid-check ${isPaid?"checked":""}">${isPaid?"✓":""}</div></div>
-        <div class="family-id">ID: ${fam.headId||""} · ${fam.nepaliMonth||""}</div>
+        <div class="card-top"><div class="family-name">${matched.name||fam.headName||""}${fam.ignored?' <span style="color:#888;font-size:11px;">(Ignored)</span>':""}</div><div class="paid-check ${isPaid?"checked":""}">${isPaid?"✓":""}</div></div>
+        <div class="family-id">ID: ${matched.id||""}${!isHeadMatch?` · Member of "${fam.headName||""}"`:""} · ${monthNep(fam.nepaliMonth)}</div>
         <div class="family-info">${fam.memberCount||0} members</div>
       </div>`;
     card.onclick=()=>openDetail(fam);
