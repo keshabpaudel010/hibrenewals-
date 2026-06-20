@@ -1137,6 +1137,14 @@ function updateMonthBadge(monthName){
   }
 }
 
+window.closeSearchResults=function(){
+  document.getElementById("search-input").value="";
+  document.querySelectorAll(".category-chip").forEach(c=>c.classList.remove("active-chip"));
+  if(searchDebounceTimer){clearTimeout(searchDebounceTimer);searchDebounceTimer=null;}
+  document.getElementById("search-results").style.display="none";
+  document.getElementById("month-grid-section").style.display="";
+};
+
 // ── CATEGORY CHIPS (browse one category across ALL months at once) ──
 function renderCategoryChips(){
   const counts={};
@@ -1306,6 +1314,7 @@ window.handleAndroidBack=function(){
   const p=document.querySelector('.page.active');
   if(p&&p.id==='page-detail'){goMonth();return true;}
   if(p&&p.id==='page-month'){monthBack();return true;}
+  if(p&&p.id==='page-home'&&document.getElementById("search-results").style.display==="block"){closeSearchResults();return true;}
   return false;
 };
 </script>
