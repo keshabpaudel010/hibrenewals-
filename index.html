@@ -49,6 +49,10 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 .overview { margin: 10px 12px; background: #eef2ff; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
 
 .filter-tabs { display: flex; gap: 8px; padding: 10px 12px; flex-wrap: wrap; }
+.category-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.category-chip { padding: 6px 14px; border-radius: 20px; border: 1px solid #1a3a6b; font-size: 13px; cursor: pointer; background: white; color: #1a3a6b; font-weight: 600; }
+.category-chip:active { background: #eef2ff; }
+.category-chip.active-chip { background: #1a3a6b; color: white; }
 .tab { padding: 6px 14px; border-radius: 20px; border: 1px solid #ccc; font-size: 13px; cursor: pointer; background: white; }
 .tab.active { background: #1a3a6b; color: white; border-color: #1a3a6b; }
 
@@ -242,6 +246,10 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
   <div class="search-wrap">
     <input type="text" id="search-input" placeholder="Search..." oninput="handleSearch(this.value)">
     <button class="qr-btn" onclick="openHomeQR()">📷</button>
+  </div>
+  <div id="category-chips-section" style="padding:0 12px 4px;">
+    <div style="font-size:13px;color:#555;margin-bottom:6px;">🔎 Browse All Months by Category:</div>
+    <div class="category-chips" id="category-chips"></div>
   </div>
   <div id="search-results" style="display:none; padding:10px 12px;">
     <div style="font-size:13px;color:#555;margin-bottom:8px;" id="search-count"></div>
@@ -828,7 +836,7 @@ function loadFromLocal(){
 async function preloadAllData(){
   // First load from localStorage so UI works offline immediately
   const hadLocal = loadFromLocal();
-  if(hadLocal){ buildMonthGrid(); updateAllBadges(); }
+  if(hadLocal){ buildMonthGrid(); updateAllBadges(); renderCategoryChips(); }
 
   // Then try to fetch fresh data from Firestore
   const isOnline = navigator.onLine;
@@ -853,6 +861,7 @@ async function preloadAllData(){
   if(anyLoaded){
     saveToLocal();
     updateAllBadges();
+    renderCategoryChips();
     showToast("✅ Data updated!");
   }
 }
@@ -1128,10 +1137,59 @@ function updateMonthBadge(monthName){
   }
 }
 
+// ── CATEGORY CHIPS (browse one category across ALL months at once) ──
+function renderCategoryChips(){
+  const counts={};
+  for(const m of MONTHS){
+    for(const fam of(cache[m.name]||[])){
+      const t=fam.familyType||"Unknown";
+      counts[t]=(counts[t]||0)+1;
+    }
+  }
+  const types=Object.keys(counts).sort((a,b)=>{
+    const ai=CATEGORY_ORDER.findIndex(c=>c.toLowerCase()===a.toLowerCase());
+    const bi=CATEGORY_ORDER.findIndex(c=>c.toLowerCase()===b.toLowerCase());
+    const aRank=ai===-1?CATEGORY_ORDER.length:ai;
+    const bRank=bi===-1?CATEGORY_ORDER.length:bi;
+    if(aRank!==bRank)return aRank-bRank;
+    return a.localeCompare(b);
+  });
+  const wrap=document.getElementById("category-chips");
+  wrap.innerHTML="";
+  for(const t of types){
+    const chip=document.createElement("div");
+    chip.className="category-chip";
+    chip.textContent=`${t} (${counts[t]})`;
+    chip.onclick=()=>browseCategory(t,chip);
+    wrap.appendChild(chip);
+  }
+}
+
+window.browseCategory=function(type,chipEl){
+  document.querySelectorAll(".category-chip").forEach(c=>c.classList.remove("active-chip"));
+  if(chipEl)chipEl.classList.add("active-chip");
+  document.getElementById("search-input").value="";
+  if(searchDebounceTimer){clearTimeout(searchDebounceTimer);searchDebounceTimer=null;}
+
+  const resultsEl=document.getElementById("search-results");
+  const monthSection=document.getElementById("month-grid-section");
+  resultsEl.style.display="block";monthSection.style.display="none";
+
+  const results=[];
+  for(const m of MONTHS){
+    for(const fam of(cache[m.name]||[])){
+      if((fam.familyType||"Unknown")===type)results.push({fam,matched:(fam.members||[]).find(mm=>mm.id===fam.headId)||{id:fam.headId,name:fam.headName,photoUrl:fam.headPhotoUrl||""}});
+    }
+  }
+  document.getElementById("search-count").textContent=`📋 ${type}: ${results.length} family(ies) found across all months`;
+  renderResultCards(results);
+};
+
 // ── SEARCH (debounced — only runs ~280ms after typing pauses, so the
 // keyboard never freezes while results are being built) ──
 let searchDebounceTimer=null;
 window.handleSearch=function(query){
+  document.querySelectorAll(".category-chip").forEach(c=>c.classList.remove("active-chip"));
   const resultsEl=document.getElementById("search-results");
   const monthSection=document.getElementById("month-grid-section");
   if(searchDebounceTimer){clearTimeout(searchDebounceTimer);searchDebounceTimer=null;}
@@ -1156,6 +1214,10 @@ window.performSearch=function(query){
     }
   }
   document.getElementById("search-count").textContent=`${results.length} result(s) found`;
+  renderResultCards(results);
+};
+
+function renderResultCards(results){
   const listEl=document.getElementById("search-list");listEl.innerHTML="";
   if(!results.length){listEl.innerHTML=`<div class="empty">No results</div>`;return;}
   const LIMIT=60;
@@ -1204,7 +1266,7 @@ window.performSearch=function(query){
     more.textContent=`Showing first ${LIMIT} of ${results.length} — type more to narrow it down`;
     listEl.appendChild(more);
   }
-};
+}
 
 window.filterCards=function(filter,el){
   document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
