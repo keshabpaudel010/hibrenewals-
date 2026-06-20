@@ -48,13 +48,15 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 .back-btn { display: block; padding: 10px 14px; color: #1a3a6b; font-size: 14px; cursor: pointer; border-bottom: 1px solid #eee; width: 100%; background: white; }
 .overview { margin: 10px 12px; background: #eef2ff; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
 
-.filter-tabs { display: flex; gap: 8px; padding: 10px 12px; }
+.filter-tabs { display: flex; gap: 8px; padding: 10px 12px; flex-wrap: wrap; }
 .tab { padding: 6px 14px; border-radius: 20px; border: 1px solid #ccc; font-size: 13px; cursor: pointer; background: white; }
 .tab.active { background: #1a3a6b; color: white; border-color: #1a3a6b; }
 
 .family-list { padding: 0 12px 20px; }
 .swipe-wrapper { position: relative; overflow: hidden; border-radius: 8px; margin-bottom: 10px; }
 .swipe-delete-btn { position: absolute; top: 0; right: 0; height: 100%; width: 76px; background: #e03535; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; z-index: 1; gap: 2px; }
+.swipe-ignore-btn { position: absolute; top: 0; right: 76px; height: 100%; width: 76px; background: #d97706; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; z-index: 1; gap: 2px; }
+.swipe-ignore-btn span:first-child { font-size: 18px; }
 .swipe-delete-btn span:first-child { font-size: 18px; }
 .family-card { background: white; border-radius: 8px; margin-bottom: 0; padding: 12px 14px; border-left: 4px solid #ccc; cursor: pointer; display: flex; align-items: center; gap: 12px; position: relative; z-index: 2; transition: transform 0.18s ease; }
 .family-card.paid { border-left-color: #22a05a; }
@@ -225,6 +227,7 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
       <div class="tab active" onclick="filterCards('all',this)">All</div>
       <div class="tab" onclick="filterCards('paid',this)">✅ Paid</div>
       <div class="tab" onclick="filterCards('unpaid',this)">❌ Not Paid</div>
+      <div class="tab" onclick="filterCards('ignored',this)">🙈 Ignored</div>
     </div>
     <div class="family-list" id="month-family-list"></div>
   </div>
@@ -445,6 +448,42 @@ async function permanentlyDeleteFamily(fam){
     }else{
       renderTypeGrid();
       if(monthViewState==="list")renderMonthList(currentFilter);
+    }
+  }catch(e){
+    showSyncBar(false);
+    showToast("❌ Error: "+e.message);
+  }
+}
+
+function confirmIgnoreFamily(fam){
+  if(fam.ignored){
+    toggleIgnoreFamily(fam); // restoring needs no confirmation
+    return;
+  }
+  showConfirm(
+    "🙈 Ignore Family?",
+    `"${fam.headName}" will be hidden from the Paid/Unpaid lists until you restore them. Their data stays safe — nothing is deleted.\n\nAre you sure?`,
+    ()=>toggleIgnoreFamily(fam)
+  );
+}
+
+async function toggleIgnoreFamily(fam){
+  const newIgnored=!fam.ignored;
+  showSyncBar(true);
+  try{
+    await updateDoc(doc(db,"months",fam.nepaliMonth,"families",fam.headId),{ignored:newIgnored});
+    fam.ignored=newIgnored;
+    if(cache[fam.nepaliMonth]){
+      const idx=cache[fam.nepaliMonth].findIndex(f=>f.headId===fam.headId);
+      if(idx!==-1)cache[fam.nepaliMonth][idx]=fam;
+    }
+    saveToLocal();
+    showSyncBar(false);
+    showToast(newIgnored?"🙈 Family ignored":"↩️ Family restored");
+    if(document.getElementById("search-results").style.display==="block"){
+      handleSearch(document.getElementById("search-input").value);
+    }else{
+      renderMonthList(currentFilter);
     }
   }catch(e){
     showSyncBar(false);
@@ -693,13 +732,20 @@ window.monthBack=function(){
 function renderMonthList(filter){
   currentFilter=filter;
   const list=document.getElementById("month-family-list");
-  let filtered=currentFamilies.filter(f=>(f.familyType||"Unknown")===currentTypeFilter);
-  if(filter==="paid")filtered=filtered.filter(f=>f.paid);
-  if(filter==="unpaid")filtered=filtered.filter(f=>!f.paid);
-  const total=filtered.length;
-  const paid=filtered.filter(f=>f.paid).length;
+  let typeFamilies=currentFamilies.filter(f=>(f.familyType||"Unknown")===currentTypeFilter);
+  const activeFamilies=typeFamilies.filter(f=>!f.ignored);
+  const ignoredFamilies=typeFamilies.filter(f=>f.ignored);
+
+  let filtered;
+  if(filter==="ignored")filtered=ignoredFamilies;
+  else if(filter==="paid")filtered=activeFamilies.filter(f=>f.paid);
+  else if(filter==="unpaid")filtered=activeFamilies.filter(f=>!f.paid);
+  else filtered=activeFamilies;
+
+  const total=activeFamilies.length;
+  const paid=activeFamilies.filter(f=>f.paid).length;
   const unpaid=total-paid;
-  document.getElementById("month-overview").innerHTML=`<strong>${currentMonth.nep} · ${currentTypeFilter}</strong> &nbsp;|&nbsp; Total: <strong>${total}</strong> &nbsp;|&nbsp; ✅ Paid: <strong style="color:#22a05a">${paid}</strong> &nbsp;|&nbsp; ❌ Unpaid: <strong style="color:#e03535">${unpaid}</strong>`;
+  document.getElementById("month-overview").innerHTML=`<strong>${currentMonth.nep} · ${currentTypeFilter}</strong> &nbsp;|&nbsp; Total: <strong>${total}</strong> &nbsp;|&nbsp; ✅ Paid: <strong style="color:#22a05a">${paid}</strong> &nbsp;|&nbsp; ❌ Unpaid: <strong style="color:#e03535">${unpaid}</strong> &nbsp;|&nbsp; 🙈 Ignored: <strong style="color:#888">${ignoredFamilies.length}</strong>`;
   if(!filtered.length){list.innerHTML=`<div class="empty">No families found</div>`;return;}
   list.innerHTML="";
   for(const fam of filtered){
@@ -712,7 +758,7 @@ function renderMonthList(filter){
       ${photoUrl?`<img class="family-photo" src="${photoUrl}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ""}
       <div class="family-photo-placeholder" ${photoUrl?'style="display:none"':""}>👤</div>
       <div class="card-info">
-        <div class="card-top"><div class="family-name">${fam.headName||"Unknown"}</div><div class="paid-check ${isPaid?"checked":""}">${isPaid?"✓":""}</div></div>
+        <div class="card-top"><div class="family-name">${fam.headName||"Unknown"}${fam.ignored?' <span style="color:#888;font-size:11px;">(Ignored)</span>':""}</div><div class="paid-check ${isPaid?"checked":""}">${isPaid?"✓":""}</div></div>
         <div class="family-id">ID: ${fam.headId||""}</div>
         <div class="family-info">${fam.memberCount||0} members · ${fam.familyType||""}</div>
       </div>`;
@@ -723,13 +769,18 @@ function renderMonthList(filter){
     const wrapper=document.createElement("div");
     wrapper.className="swipe-wrapper";
     wrapper.dataset.open="0";
+    const ignoreBtn=document.createElement("div");
+    ignoreBtn.className="swipe-ignore-btn";
+    ignoreBtn.innerHTML=fam.ignored?`<span>↩️</span><span>Restore</span>`:`<span>🙈</span><span>Ignore</span>`;
+    ignoreBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmIgnoreFamily(fam);};
     const delBtn=document.createElement("div");
     delBtn.className="swipe-delete-btn";
     delBtn.innerHTML=`<span>🗑️</span><span>Delete</span>`;
     delBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmDeleteFamily(fam);};
+    wrapper.appendChild(ignoreBtn);
     wrapper.appendChild(delBtn);
     wrapper.appendChild(card);
-    attachSwipe(wrapper,card,76);
+    attachSwipe(wrapper,card,152);
     list.appendChild(wrapper);
   }
 }
@@ -894,7 +945,7 @@ window.handleSearch=async function(query){
       ${photoUrl?`<img class="family-photo" src="${photoUrl}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ""}
       <div class="family-photo-placeholder" ${photoUrl?'style="display:none"':""}>👤</div>
       <div class="card-info">
-        <div class="card-top"><div class="family-name">${fam.headName||""}</div><div class="paid-check ${isPaid?"checked":""}">${isPaid?"✓":""}</div></div>
+        <div class="card-top"><div class="family-name">${fam.headName||""}${fam.ignored?' <span style="color:#888;font-size:11px;">(Ignored)</span>':""}</div><div class="paid-check ${isPaid?"checked":""}">${isPaid?"✓":""}</div></div>
         <div class="family-id">ID: ${fam.headId||""} · ${fam.nepaliMonth||""}</div>
         <div class="family-info">${fam.memberCount||0} members</div>
       </div>`;
@@ -905,13 +956,18 @@ window.handleSearch=async function(query){
     const wrapper=document.createElement("div");
     wrapper.className="swipe-wrapper";
     wrapper.dataset.open="0";
+    const ignoreBtn=document.createElement("div");
+    ignoreBtn.className="swipe-ignore-btn";
+    ignoreBtn.innerHTML=fam.ignored?`<span>↩️</span><span>Restore</span>`:`<span>🙈</span><span>Ignore</span>`;
+    ignoreBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmIgnoreFamily(fam);};
     const delBtn=document.createElement("div");
     delBtn.className="swipe-delete-btn";
     delBtn.innerHTML=`<span>🗑️</span><span>Delete</span>`;
     delBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmDeleteFamily(fam);};
+    wrapper.appendChild(ignoreBtn);
     wrapper.appendChild(delBtn);
     wrapper.appendChild(card);
-    attachSwipe(wrapper,card,76);
+    attachSwipe(wrapper,card,152);
     listEl.appendChild(wrapper);
   }
 };
