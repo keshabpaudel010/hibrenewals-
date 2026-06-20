@@ -867,6 +867,7 @@ function openMonth(m){
   showPage("page-month");
 }
 
+const CATEGORY_ORDER=["Normal","FCHV","Ultra Poor","HIV"];
 function renderTypeGrid(){
   const counts={};
   for(const f of currentFamilies){
@@ -875,7 +876,14 @@ function renderTypeGrid(){
   }
   const grid=document.getElementById("type-grid");
   grid.innerHTML="";
-  const types=Object.keys(counts).sort();
+  const types=Object.keys(counts).sort((a,b)=>{
+    const ai=CATEGORY_ORDER.findIndex(c=>c.toLowerCase()===a.toLowerCase());
+    const bi=CATEGORY_ORDER.findIndex(c=>c.toLowerCase()===b.toLowerCase());
+    const aRank=ai===-1?CATEGORY_ORDER.length:ai;
+    const bRank=bi===-1?CATEGORY_ORDER.length:bi;
+    if(aRank!==bRank)return aRank-bRank;
+    return a.localeCompare(b);
+  });
   if(!types.length){grid.innerHTML=`<div class="empty" style="grid-column:span 2">No families found</div>`;return;}
   for(const t of types){
     const btn=document.createElement("div");
