@@ -98,6 +98,8 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 .member-info { flex: 1; }
 .m-name { font-weight: 600; font-size: 14px; }
 .m-role { color: #1a3a6b; font-size: 12px; margin-top: 2px; font-weight: 600; }
+.add-member-btn { width: 100%; padding: 12px; background: #eef2ff; color: #1a3a6b; border: 1px dashed #1a3a6b; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.add-member-btn:active { background: #d0d9f0; }
 .m-id { color: #777; font-size: 11px; font-family: monospace; margin-top: 1px; }
 .m-phone { font-size: 12px; color: #1a3a6b; text-align: right; white-space: nowrap; cursor: pointer; padding: 4px 8px; border-radius: 4px; background: #eef2ff; text-decoration: none; display: inline-block; }
 .m-phone:active { background: #d0d9f0; }
@@ -205,6 +207,29 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
   </div>
 </div>
 
+<!-- Add Member Modal -->
+<div class="confirm-overlay" id="add-member-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title">➕ Add Family Member</div>
+    <div style="text-align:left;margin-top:10px;">
+      <input class="login-input" type="text" id="am-name" placeholder="Full Name *">
+      <input class="login-input" type="text" id="am-imis" placeholder="IMIS Number *" inputmode="numeric">
+      <input class="login-input" type="text" id="am-role" placeholder="Relationship (e.g. Son, Spouse) — optional">
+      <input class="login-input" type="text" id="am-phone" placeholder="Phone — optional" inputmode="tel">
+      <select class="login-input" id="am-status">
+        <option value="">Status — optional</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+      <div class="login-error" id="am-error"></div>
+    </div>
+    <div class="confirm-btns">
+      <button class="confirm-btn cancel" onclick="closeAddMemberModal()">Cancel</button>
+      <button class="confirm-btn confirm" onclick="submitAddMember()">Add Member</button>
+    </div>
+  </div>
+</div>
+
 <!-- PAGE 1: HOME -->
 <div id="page-home" class="page active">
   <div class="header-wrap">
@@ -259,6 +284,7 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
   <div id="detail-header"></div>
   <div class="members-title">👥 FAMILY MEMBERS</div>
   <div id="members-list" style="padding-bottom:20px;"></div>
+  <div style="padding:0 12px 16px;"><button class="add-member-btn" onclick="openAddMemberModal()">➕ Add Family Member</button></div>
   <div id="enrol-history-section"></div>
 </div>
 
@@ -569,6 +595,58 @@ async function moveFamilyToMonth(fam,newMonth){
     showToast("❌ Error: "+e.message);
   }
 }
+
+window.openAddMemberModal=function(){
+  document.getElementById("am-name").value="";
+  document.getElementById("am-imis").value="";
+  document.getElementById("am-role").value="";
+  document.getElementById("am-phone").value="";
+  document.getElementById("am-status").value="";
+  document.getElementById("am-error").textContent="";
+  document.getElementById("add-member-overlay").classList.add("open");
+};
+window.closeAddMemberModal=function(){
+  document.getElementById("add-member-overlay").classList.remove("open");
+};
+window.submitAddMember=async function(){
+  const fam=currentDetailFam;
+  if(!fam)return;
+  const name=document.getElementById("am-name").value.trim();
+  const imis=document.getElementById("am-imis").value.trim();
+  const role=document.getElementById("am-role").value.trim();
+  const phone=document.getElementById("am-phone").value.trim();
+  const status=document.getElementById("am-status").value;
+  const errEl=document.getElementById("am-error");
+
+  if(!name){errEl.textContent="Name is required";return;}
+  if(!imis){errEl.textContent="IMIS number is required";return;}
+  if(!/^\d{9}$/.test(imis)){errEl.textContent="IMIS number must be 9 digits";return;}
+  if((fam.members||[]).some(m=>m.id===imis)){errEl.textContent="This IMIS number is already in this family";return;}
+  errEl.textContent="";
+
+  showSyncBar(true);
+  try{
+    const newMember={id:imis,name:name,role:role,phone:phone,photoUrl:"",status:status};
+    const updatedMembers=[...(fam.members||[]),newMember];
+    await updateDoc(doc(db,"months",fam.nepaliMonth,"families",fam.headId),{
+      members: updatedMembers,
+      memberCount: updatedMembers.length
+    });
+    fam.members=updatedMembers;fam.memberCount=updatedMembers.length;
+    if(cache[fam.nepaliMonth]){
+      const idx=cache[fam.nepaliMonth].findIndex(f=>f.headId===fam.headId);
+      if(idx!==-1)cache[fam.nepaliMonth][idx]=fam;
+    }
+    saveToLocal();
+    showSyncBar(false);
+    closeAddMemberModal();
+    showToast("✅ Member added");
+    openDetail(fam);
+  }catch(e){
+    showSyncBar(false);
+    errEl.textContent="❌ Error: "+e.message;
+  }
+};
 
 function confirmDeleteMember(fam,member,isHead){
   if(isHead){
