@@ -57,6 +57,8 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 .swipe-delete-btn { position: absolute; top: 0; right: 0; height: 100%; width: 76px; background: #e03535; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; z-index: 1; gap: 2px; }
 .swipe-ignore-btn { position: absolute; top: 0; right: 76px; height: 100%; width: 76px; background: #d97706; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; z-index: 1; gap: 2px; }
 .swipe-ignore-btn span:first-child { font-size: 18px; }
+.swipe-move-btn { position: absolute; top: 0; right: 152px; height: 100%; width: 76px; background: #2563eb; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; z-index: 1; gap: 2px; }
+.swipe-move-btn span:first-child { font-size: 18px; }
 .swipe-delete-btn span:first-child { font-size: 18px; }
 .family-card { background: white; border-radius: 8px; margin-bottom: 0; padding: 12px 14px; border-left: 4px solid #ccc; cursor: pointer; display: flex; align-items: center; gap: 12px; position: relative; z-index: 2; transition: transform 0.18s ease; }
 .family-card.paid { border-left-color: #22a05a; }
@@ -108,6 +110,10 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 
 .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 600; align-items: center; justify-content: center; padding: 20px; }
 .confirm-overlay.open { display: flex; }
+.move-month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+.move-month-btn { padding: 10px 4px; border-radius: 8px; border: 1px solid #ddd; background: #f7f7fa; text-align: center; font-size: 13px; cursor: pointer; }
+.move-month-btn.current { background: #eef2ff; border-color: #1a3a6b; font-weight: bold; color: #1a3a6b; }
+.move-month-btn:active { background: #e0e0e8; }
 .confirm-box { background: white; border-radius: 14px; padding: 24px 20px; width: 100%; max-width: 340px; }
 .confirm-title { font-size: 17px; font-weight: bold; margin-bottom: 8px; }
 .confirm-msg { font-size: 14px; color: #555; margin-bottom: 20px; line-height: 1.5; }
@@ -184,6 +190,17 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
     <div class="confirm-btns">
       <button class="confirm-btn cancel" onclick="closeConfirm()">Cancel</button>
       <button class="confirm-btn confirm" id="confirm-ok-btn">Yes, Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Move To Month Modal -->
+<div class="confirm-overlay" id="move-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title">📅 Move <span id="move-fam-name"></span> To...</div>
+    <div class="move-month-grid" id="move-month-grid"></div>
+    <div class="confirm-btns">
+      <button class="confirm-btn cancel" onclick="closeMoveModal()" style="width:100%">Cancel</button>
     </div>
   </div>
 </div>
@@ -493,6 +510,66 @@ async function toggleIgnoreFamily(fam){
   }
 }
 
+let moveTargetFam=null;
+function openMoveModal(fam){
+  moveTargetFam=fam;
+  document.getElementById("move-fam-name").textContent=`"${fam.headName||""}"`;
+  const grid=document.getElementById("move-month-grid");
+  grid.innerHTML="";
+  for(const m of MONTHS){
+    const btn=document.createElement("div");
+    btn.className="move-month-btn"+(m.name===fam.nepaliMonth?" current":"");
+    btn.textContent=m.nep;
+    btn.onclick=()=>selectMoveMonth(m.name,m.nep);
+    grid.appendChild(btn);
+  }
+  document.getElementById("move-overlay").classList.add("open");
+}
+window.closeMoveModal=function(){
+  document.getElementById("move-overlay").classList.remove("open");
+  moveTargetFam=null;
+};
+function selectMoveMonth(newMonth,newMonthNep){
+  const fam=moveTargetFam;
+  if(!fam)return;
+  closeMoveModal();
+  if(newMonth===fam.nepaliMonth){showToast("Already in that month");return;}
+  showConfirm(
+    "📅 Move Family?",
+    `Move "${fam.headName}" from ${fam.nepaliMonth} to ${newMonthNep}?`,
+    ()=>moveFamilyToMonth(fam,newMonth)
+  );
+}
+async function moveFamilyToMonth(fam,newMonth){
+  showSyncBar(true);
+  const oldMonth=fam.nepaliMonth;
+  try{
+    const oldRef=doc(db,"months",oldMonth,"families",fam.headId);
+    const newRef=doc(db,"months",newMonth,"families",fam.headId);
+    const updatedFam={...fam,nepaliMonth:newMonth};
+    delete updatedFam.id;
+    await setDoc(newRef,updatedFam);
+    await deleteDoc(oldRef);
+    if(cache[oldMonth])cache[oldMonth]=cache[oldMonth].filter(f=>f.headId!==fam.headId);
+    if(!cache[newMonth])cache[newMonth]=[];
+    const newFamObj={...updatedFam,id:fam.headId};
+    cache[newMonth].push(newFamObj);
+    updateMonthBadge(oldMonth);updateMonthBadge(newMonth);
+    saveToLocal();
+    showSyncBar(false);
+    showToast(`✅ Moved to ${newMonth}`);
+    if(document.getElementById("search-results").style.display==="block"){
+      handleSearch(document.getElementById("search-input").value);
+    }else if(currentMonth&&currentMonth.name===oldMonth){
+      renderTypeGrid();
+      if(monthViewState==="list")renderMonthList(currentFilter);
+    }
+  }catch(e){
+    showSyncBar(false);
+    showToast("❌ Error: "+e.message);
+  }
+}
+
 function confirmDeleteMember(fam,member,isHead){
   if(isHead){
     showToast("⚠️ To remove the head, delete the whole family instead");
@@ -608,16 +685,31 @@ onAuthStateChanged(auth,async(user)=>{
   }
 });
 
-// ── COPY PHONE ──
-window.copyPhone=function(phone){
-  if(!phone||phone==="—")return;
+// ── COPY TEXT (insurance number etc.) ──
+window.copyText=function(text){
+  if(!text)return;
   if(navigator.clipboard){
-    navigator.clipboard.writeText(phone).then(()=>showToast("📋 Copied: "+phone));
+    navigator.clipboard.writeText(text).then(()=>showToast("📋 Copied: "+text));
   }else{
     const el=document.createElement("textarea");
-    el.value=phone;document.body.appendChild(el);el.select();
+    el.value=text;document.body.appendChild(el);el.select();
     document.execCommand("copy");document.body.removeChild(el);
-    showToast("📋 Copied: "+phone);
+    showToast("📋 Copied: "+text);
+  }
+};
+
+// ── TAP-AGAIN-TO-CALL ──
+window.handlePhoneTap=function(phone,el){
+  if(!phone||phone==="—")return;
+  const now=Date.now();
+  const last=parseInt(el.dataset.tapTime||"0",10);
+  if(now-last<3000){
+    el.dataset.tapTime="0";
+    window.location.href="tel:"+phone;
+  }else{
+    el.dataset.tapTime=String(now);
+    showToast("📞 Touch again to call");
+    setTimeout(()=>{if(el.dataset.tapTime===String(now))el.dataset.tapTime="0";},3000);
   }
 };
 
@@ -771,6 +863,10 @@ function renderMonthList(filter){
     const wrapper=document.createElement("div");
     wrapper.className="swipe-wrapper";
     wrapper.dataset.open="0";
+    const moveBtn=document.createElement("div");
+    moveBtn.className="swipe-move-btn";
+    moveBtn.innerHTML=`<span>📅</span><span>Move</span>`;
+    moveBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();openMoveModal(fam);};
     const ignoreBtn=document.createElement("div");
     ignoreBtn.className="swipe-ignore-btn";
     ignoreBtn.innerHTML=fam.ignored?`<span>↩️</span><span>Restore</span>`:`<span>🙈</span><span>Ignore</span>`;
@@ -779,10 +875,11 @@ function renderMonthList(filter){
     delBtn.className="swipe-delete-btn";
     delBtn.innerHTML=`<span>🗑️</span><span>Delete</span>`;
     delBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmDeleteFamily(fam);};
+    wrapper.appendChild(moveBtn);
     wrapper.appendChild(ignoreBtn);
     wrapper.appendChild(delBtn);
     wrapper.appendChild(card);
-    attachSwipe(wrapper,card,152);
+    attachSwipe(wrapper,card,228);
     list.appendChild(wrapper);
   }
 }
@@ -822,9 +919,9 @@ function openDetail(fam){
       <div class="member-info">
         <div class="m-name">${m.name||""} ${isHead?"⭐":""}</div>
         <div class="m-role">${m.role||"Head"}</div>
-        <div class="m-id">${m.id||""}</div>
+        <div class="m-id" onclick="copyText('${m.id||""}')">${m.id||""}</div>
       </div>
-      <div class="m-phone" onclick="copyPhone('${m.phone||''}')">${m.phone||"—"}</div>`;
+      <div class="m-phone" onclick="handlePhoneTap('${m.phone||''}',this)">${m.phone||"—"}</div>`;
 
     const mwrapper=document.createElement("div");
     mwrapper.className="swipe-wrapper-member";
@@ -959,6 +1056,10 @@ window.handleSearch=async function(query){
     const wrapper=document.createElement("div");
     wrapper.className="swipe-wrapper";
     wrapper.dataset.open="0";
+    const moveBtn=document.createElement("div");
+    moveBtn.className="swipe-move-btn";
+    moveBtn.innerHTML=`<span>📅</span><span>Move</span>`;
+    moveBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();openMoveModal(fam);};
     const ignoreBtn=document.createElement("div");
     ignoreBtn.className="swipe-ignore-btn";
     ignoreBtn.innerHTML=fam.ignored?`<span>↩️</span><span>Restore</span>`:`<span>🙈</span><span>Ignore</span>`;
@@ -967,10 +1068,11 @@ window.handleSearch=async function(query){
     delBtn.className="swipe-delete-btn";
     delBtn.innerHTML=`<span>🗑️</span><span>Delete</span>`;
     delBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmDeleteFamily(fam);};
+    wrapper.appendChild(moveBtn);
     wrapper.appendChild(ignoreBtn);
     wrapper.appendChild(delBtn);
     wrapper.appendChild(card);
-    attachSwipe(wrapper,card,152);
+    attachSwipe(wrapper,card,228);
     listEl.appendChild(wrapper);
   }
 };
