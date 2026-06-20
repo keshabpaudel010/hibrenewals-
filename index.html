@@ -1,1 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>HIB Renewals</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480px; margin: 0 auto; }
 
+/* LOGIN */
+.login-screen { position: fixed; inset: 0; background: #1a3a6b; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; padding: 30px 24px; }
+.login-screen.hide { display: none; }
+.login-logo { font-size: 56px; margin-bottom: 10px; }
+.login-title { color: white; font-size: 24px; font-weight: bold; }
+.login-sub { color: rgba(255,255,255,0.7); font-size: 13px; margin-top: 4px; margin-bottom: 32px; }
+.login-box { background: white; border-radius: 16px; padding: 24px 20px; width: 100%; }
+.login-input { width: 100%; padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; margin-bottom: 12px; outline: none; }
+.login-input:focus { border-color: #1a3a6b; }
+.login-btn { width: 100%; padding: 14px; background: #1a3a6b; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+.login-btn:active { opacity: 0.8; }
+.login-btn:disabled { opacity: 0.6; }
+.login-error { color: #e03535; font-size: 13px; margin-top: 10px; text-align: center; min-height: 20px; }
+
+.header { background: #1a3a6b; color: white; padding: 14px 16px; text-align: center; }
+.header h1 { font-size: 18px; font-weight: bold; }
+.header p { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+.logout-btn { position: absolute; right: 12px; top: 12px; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.header-wrap { position: relative; }
+
+.search-wrap { padding: 10px 12px; background: white; border-bottom: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
+.search-wrap input { flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; min-width: 0; }
+.qr-btn { background: #1a3a6b; color: white; border: none; border-radius: 6px; padding: 8px 14px; font-size: 18px; cursor: pointer; flex-shrink: 0; width: 44px; height: 38px; display: flex; align-items: center; justify-content: center; }
+
+.page { display: none; }
+.page.active { display: block; }
+
+.month-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 14px 12px; }
+.month-btn { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 14px 10px; text-align: center; font-size: 14px; font-weight: 600; cursor: pointer; position: relative; }
+.month-btn:active { background: #eef2ff; }
+.month-btn.current-month { border: 2px solid #1a3a6b; background: #eef2ff; }
+.month-badge { position: absolute; top: 6px; right: 8px; background: #e03535; color: white; border-radius: 10px; font-size: 10px; font-weight: bold; padding: 1px 6px; }
+.month-nep { font-size: 16px; font-weight: 800; color: #1a3a6b; }
+.month-eng { font-size: 11px; color: #888; margin-top: 2px; }
+.month-count { font-size: 11px; color: #555; margin-top: 6px; }
+
+.back-btn { display: block; padding: 10px 14px; color: #1a3a6b; font-size: 14px; cursor: pointer; border-bottom: 1px solid #eee; width: 100%; background: white; }
+.overview { margin: 10px 12px; background: #eef2ff; border-radius: 8px; padding: 10px 14px; font-size: 13px; }
+
+.filter-tabs { display: flex; gap: 8px; padding: 10px 12px; flex-wrap: wrap; }
+.tab { padding: 6px 14px; border-radius: 20px; border: 1px solid #ccc; font-size: 13px; cursor: pointer; background: white; }
+.tab.active { background: #1a3a6b; color: white; border-color: #1a3a6b; }
+
+.family-list { padding: 0 12px 20px; }
+.swipe-wrapper { position: relative; overflow: hidden; border-radius: 8px; margin-bottom: 10px; }
+.swipe-delete-btn { position: absolute; top: 0; right: 0; height: 100%; width: 76px; background: #e03535; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; z-index: 1; gap: 2px; }
+.swipe-ignore-btn { position: absolute; top: 0; right: 76px; height: 100%; width: 76px; background: #d97706; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; z-index: 1; gap: 2px; }
+.swipe-ignore-btn span:first-child { font-size: 18px; }
+.swipe-move-btn { position: absolute; top: 0; right: 152px; height: 100%; width: 76px; background: #2563eb; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; z-index: 1; gap: 2px; }
+.swipe-move-btn span:first-child { font-size: 18px; }
+.swipe-delete-btn span:first-child { font-size: 18px; }
+.family-card { background: white; border-radius: 8px; margin-bottom: 0; padding: 12px 14px; border-left: 4px solid #ccc; cursor: pointer; display: flex; align-items: center; gap: 12px; position: relative; z-index: 2; transition: transform 0.18s ease; }
+.family-card.paid { border-left-color: #22a05a; }
+.family-card.unpaid { border-left-color: #e03535; }
+.family-photo { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: #eee; flex-shrink: 0; border: 1px solid #ddd; }
+.family-photo-placeholder { width: 48px; height: 48px; border-radius: 8px; background: #eee; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; border: 1px solid #ddd; }
+.card-info { flex: 1; min-width: 0; }
+.card-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.family-name { font-size: 15px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge { font-size: 11px; font-weight: bold; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+.badge.paid { background: #d4f5e2; color: #166534; }
+.badge.unpaid { background: #fde8e8; color: #b91c1c; }
+.paid-check { width: 28px; height: 28px; border-radius: 7px; border: 2px solid #ccc; background: white; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: bold; color: white; cursor: pointer; }
+.paid-check.checked { background: #22a05a; border-color: #22a05a; }
+.paid-check.saving { opacity: 0.5; pointer-events: none; }
+.family-id { font-size: 12px; color: #e03535; margin-top: 3px; }
+.family-info { font-size: 12px; color: #555; margin-top: 2px; }
+
+.detail-header { padding: 14px 12px; background: white; border-bottom: 1px solid #eee; display: flex; gap: 12px; align-items: flex-start; }
+.detail-photo { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; background: #eee; flex-shrink: 0; border: 2px solid #1a3a6b; }
+.detail-photo-placeholder { width: 64px; height: 64px; border-radius: 10px; background: #eee; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 2rem; border: 2px solid #1a3a6b; }
+.detail-info { flex: 1; }
+.detail-name { font-size: 17px; font-weight: bold; }
+.detail-meta { font-size: 13px; color: #555; margin-top: 4px; }
+.detail-badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.dbadge { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+.dbadge-month { background: #eef2ff; color: #1a3a6b; }
+.dbadge-type { background: #f0fdf4; color: #166534; }
+
+.members-title { padding: 10px 12px 4px; font-size: 13px; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+.swipe-wrapper-member { position: relative; overflow: hidden; margin: 4px 12px; border-radius: 6px; }
+.member-row { background: white; margin: 0; border-radius: 6px; padding: 10px 12px; font-size: 13px; display: flex; align-items: center; gap: 10px; position: relative; z-index: 2; transition: transform 0.18s ease; }
+.member-row.status-active { background: #e3f9e9; }
+.member-row.status-inactive { background: #fde8e8; }
+.member-photo { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #eee; flex-shrink: 0; border: 1px solid #ddd; cursor: pointer; }
+.member-photo-placeholder { width: 44px; height: 44px; border-radius: 50%; background: #eee; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+.member-info { flex: 1; }
+.m-name { font-weight: 600; font-size: 14px; }
+.m-role { color: #1a3a6b; font-size: 12px; margin-top: 2px; font-weight: 600; }
+.add-member-btn { width: 100%; padding: 12px; background: #eef2ff; color: #1a3a6b; border: 1px dashed #1a3a6b; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.add-member-btn:active { background: #d0d9f0; }
+.m-id { color: #777; font-size: 11px; font-family: monospace; margin-top: 1px; }
+.m-phone { font-size: 12px; color: #1a3a6b; text-align: right; white-space: nowrap; cursor: pointer; padding: 4px 8px; border-radius: 4px; background: #eef2ff; text-decoration: none; display: inline-block; }
+.m-phone:active { background: #d0d9f0; }
+
+.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
+.toast.show { opacity: 1; }
+
+.sync-bar { display: none; background: #ff9800; color: white; text-align: center; font-size: 12px; padding: 4px; }
+.sync-bar.show { display: block; }
+
+.confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 600; align-items: center; justify-content: center; padding: 20px; }
+.confirm-overlay.open { display: flex; }
+.move-month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+.move-month-btn { padding: 10px 4px; border-radius: 8px; border: 1px solid #ddd; background: #f7f7fa; text-align: center; font-size: 13px; cursor: pointer; }
+.move-month-btn.current { background: #eef2ff; border-color: #1a3a6b; font-weight: bold; color: #1a3a6b; }
+.move-month-btn:active { background: #e0e0e8; }
+.confirm-box { background: white; border-radius: 14px; padding: 24px 20px; width: 100%; max-width: 340px; }
+.confirm-title { font-size: 17px; font-weight: bold; margin-bottom: 8px; }
+.confirm-msg { font-size: 14px; color: #555; margin-bottom: 20px; line-height: 1.5; }
+.confirm-btns { display: flex; gap: 10px; }
+.confirm-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
+.confirm-btn.cancel { background: #eee; color: #333; }
+.confirm-btn.confirm { background: #22a05a; color: white; }
+
+.splash { position: fixed; inset: 0; background: #1a3a6b; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.5s; }
+.splash.hide { opacity: 0; pointer-events: none; }
+.splash h1 { color: white; font-size: 26px; font-weight: bold; margin-top: 16px; }
+.splash p { color: rgba(255,255,255,0.7); font-size: 14px; margin-top: 8px; }
+.splash-spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; margin-top: 30px; }
+
+.photo-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 500; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
+.photo-modal.open { display: flex; }
+.photo-modal img { max-width: 100%; max-height: 70vh; border-radius: 12px; }
+.photo-modal-name { color: white; font-size: 15px; font-weight: 700; margin-top: 12px; }
+.photo-modal-role { color: #aaa; font-size: 12px; margin-top: 4px; }
+.photo-close-btn { margin-top: 16px; padding: 10px 32px; background: white; border: none; border-radius: 20px; font-size: 14px; cursor: pointer; }
+
+.qr-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 300; justify-content: center; align-items: center; }
+.qr-modal-overlay.open { display: flex; }
+.qr-modal { background: white; width: 90%; max-width: 400px; border-radius: 12px; padding: 16px; }
+.qr-modal-title { font-size: 15px; font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; }
+.qr-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #888; }
+
+.loading { display: flex; align-items: center; justify-content: center; padding: 40px; gap: 10px; color: #888; font-size: 14px; }
+.spinner { width: 20px; height: 20px; border: 2px solid #ddd; border-top-color: #1a3a6b; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { text-align: center; padding: 40px 20px; color: #888; font-size: 14px; }
+
+.history-title { font-size: 13px; font-weight: bold; color: #555; padding: 16px 12px 6px; letter-spacing: 0.5px; }
+.history-table { width: calc(100% - 24px); margin: 0 12px 16px; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.history-table th { background: #e8e6f5; color: #1a1a3a; font-size: 13px; padding: 10px 8px; text-align: left; }
+.history-table td { font-size: 13px; padding: 10px 8px; border-top: 1px solid #f0f0f0; }
+
+</style>
+</head>
+<body>
+
+<!-- Splash -->
+<div class="splash" id="splash">
+  <div style="font-size:48px;">🏥</div>
+  <h1>HIB Renewals</h1>
+  <p>Health Insurance Board — Nepal</p>
+  <div class="splash-spinner"></div>
+</div>
+
+<!-- Login Screen -->
+<div class="login-screen" id="login-screen">
+  <div class="login-logo">🏥</div>
+  <div class="login-title">HIB Renewals</div>
+  <div class="login-sub">Health Insurance Board — Nepal</div>
+  <div class="login-box">
+    <input class="login-input" type="email" id="login-email" placeholder="Email" autocomplete="email">
+    <input class="login-input" type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+    <button class="login-btn" id="login-btn">Login</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- Sync bar -->
+<div class="sync-bar" id="sync-bar">⏳ Saving in background...</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Confirm Modal -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Are you sure?</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <button class="confirm-btn cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="confirm-btn confirm" id="confirm-ok-btn">Yes, Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Move To Month Modal -->
+<div class="confirm-overlay" id="move-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title">📅 Move <span id="move-fam-name"></span> To...</div>
+    <div class="move-month-grid" id="move-month-grid"></div>
+    <div class="confirm-btns">
+      <button class="confirm-btn cancel" onclick="closeMoveModal()" style="width:100%">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Member Modal -->
+<div class="confirm-overlay" id="add-member-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title">➕ Add Family Member</div>
+    <div style="text-align:left;margin-top:10px;">
+      <input class="login-input" type="text" id="am-name" placeholder="Full Name *">
+      <input class="login-input" type="text" id="am-imis" placeholder="IMIS Number *" inputmode="numeric">
+      <input class="login-input" type="text" id="am-role" placeholder="Relationship (e.g. Son, Spouse) — optional">
+      <input class="login-input" type="text" id="am-phone" placeholder="Phone — optional" inputmode="tel">
+      <select class="login-input" id="am-status">
+        <option value="">Status — optional</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+      <div class="login-error" id="am-error"></div>
+    </div>
+    <div class="confirm-btns">
+      <button class="confirm-btn cancel" onclick="closeAddMemberModal()">Cancel</button>
+      <button class="confirm-btn confirm" onclick="submitAddMember()">Add Member</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 1: HOME -->
+<div id="page-home" class="page active">
+  <div class="header-wrap">
+    <div class="header">
+      <h1>HIB Renewals</h1>
+      <p id="current-month-label">Health Insurance Board — Nepal</p>
+    </div>
+    <button class="logout-btn" id="logout-btn">Logout</button>
+  </div>
+  <div class="search-wrap">
+    <input type="text" id="search-input" placeholder="Search..." oninput="handleSearch(this.value)">
+    <button class="qr-btn" onclick="openHomeQR()">📷</button>
+  </div>
+  <div id="search-results" style="display:none; padding:10px 12px;">
+    <div style="font-size:13px;color:#555;margin-bottom:8px;" id="search-count"></div>
+    <div id="search-list" class="family-list" style="padding:0;"></div>
+  </div>
+  <div id="month-grid-section">
+    <div style="padding:10px 12px 2px;font-size:13px;color:#555;">Select Renewal Month:</div>
+    <div class="month-grid" id="month-grid">
+      <div class="loading" style="grid-column:span 2"><div class="spinner"></div> Loading...</div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 2: MONTH VIEW -->
+<div id="page-month" class="page">
+  <div class="header"><h1 id="month-title">Month</h1><p>Renewal Targets</p></div>
+  <div class="back-btn" id="month-back-btn" onclick="monthBack()">← Back to Months</div>
+
+  <div id="type-grid-section">
+    <div style="padding:10px 12px 2px;font-size:13px;color:#555;">Select Category:</div>
+    <div class="month-grid" id="type-grid"></div>
+  </div>
+
+  <div id="month-list-section" style="display:none;">
+    <div class="overview" id="month-overview"></div>
+    <div class="filter-tabs">
+      <div class="tab active" onclick="filterCards('all',this)">All</div>
+      <div class="tab" onclick="filterCards('paid',this)">✅ Paid</div>
+      <div class="tab" onclick="filterCards('unpaid',this)">❌ Not Paid</div>
+      <div class="tab" onclick="filterCards('ignored',this)">🙈 Ignored</div>
+    </div>
+    <div class="family-list" id="month-family-list"></div>
+  </div>
+</div>
+
+<!-- PAGE 3: FAMILY DETAIL -->
+<div id="page-detail" class="page">
+  <div class="header"><h1 id="detail-title">Family</h1><p>Family Details</p></div>
+  <div class="back-btn" onclick="goMonth()">← Back to List</div>
+  <div id="detail-header"></div>
+  <div class="members-title">👥 FAMILY MEMBERS</div>
+  <div id="members-list" style="padding-bottom:20px;"></div>
+  <div style="padding:0 12px 16px;"><button class="add-member-btn" onclick="openAddMemberModal()">➕ Add Family Member</button></div>
+  <div id="enrol-history-section"></div>
+</div>
+
+<!-- Photo Modal -->
+<div class="photo-modal" id="photo-modal" onclick="closePhoto()">
+  <img id="photo-modal-img" src="" alt="">
+  <div class="photo-modal-name" id="photo-modal-name"></div>
+  <div class="photo-modal-role" id="photo-modal-role"></div>
+  <button class="photo-close-btn">Close</button>
+</div>
+
+<!-- QR Modal -->
+<div class="qr-modal-overlay" id="home-qr-modal">
+  <div class="qr-modal">
+    <div class="qr-modal-title">
+      Scan ID Card
+      <button class="qr-close" onclick="closeHomeQR()">✕</button>
+    </div>
+    <div id="home-qr-reader"></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, getDocs, doc, updateDoc, setDoc, deleteDoc, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB22S8shnUvD5qNh-9xOShpyWHU_PbOmkI",
+  authDomain: "hibrenewals.firebaseapp.com",
+  projectId: "hibrenewals",
+  storageBucket: "hibrenewals.firebasestorage.app",
+  messagingSenderId: "55515281998",
+  appId: "1:55515281998:android:946a4d81709355aa9ba11f"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+enableIndexedDbPersistence(db).catch(()=>{});
+
+// ── BS CALENDAR ──
+const BS_DATA = {
+  2000:[30,32,31,32,31,30,30,30,29,30,29,30],2001:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2002:[31,32,31,32,31,30,30,30,29,30,29,31],2003:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2004:[31,32,31,32,31,30,30,30,29,30,29,31],2005:[31,32,31,32,31,30,30,30,29,30,29,30],
+  2006:[31,32,31,32,31,30,30,30,29,30,29,31],2007:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2008:[31,31,32,31,31,31,30,29,30,29,30,30],2009:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2010:[31,31,32,31,31,31,30,29,30,29,30,30],2011:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2012:[31,32,31,32,31,30,30,30,29,30,29,31],2013:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2014:[31,31,32,31,31,31,30,29,30,29,30,30],2015:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2016:[31,31,32,31,31,31,30,29,30,29,30,30],2017:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2018:[31,32,31,32,31,30,30,30,29,30,29,31],2019:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2020:[31,31,32,31,31,31,30,29,30,29,30,30],2021:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2022:[31,31,32,31,31,31,30,29,30,29,30,30],2023:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2024:[31,32,31,32,31,30,30,30,29,30,29,31],2025:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2026:[31,31,32,31,31,31,30,29,30,29,30,30],2027:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2028:[31,31,32,31,31,31,30,29,30,29,30,30],2029:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2030:[31,32,31,32,31,30,30,30,29,30,29,31],2031:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2032:[31,31,32,31,31,31,30,29,30,29,30,30],2033:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2034:[31,31,32,31,31,31,30,29,30,29,30,30],2035:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2036:[31,32,31,32,31,30,30,30,29,30,29,31],2037:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2038:[31,31,32,31,31,31,30,29,30,29,30,30],2039:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2040:[31,31,32,31,31,31,30,29,30,29,30,30],2041:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2042:[31,32,31,32,31,30,30,30,29,30,29,31],2043:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2044:[31,31,32,31,31,31,30,29,30,29,30,30],2045:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2046:[31,31,32,31,31,31,30,29,30,29,30,30],2047:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2048:[31,32,31,32,31,30,30,30,29,30,29,31],2049:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2050:[31,31,32,31,31,31,30,29,30,29,30,30],2051:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2052:[31,31,32,31,31,31,30,29,30,29,30,30],2053:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2054:[31,32,31,32,31,30,30,30,29,30,29,31],2055:[31,32,31,32,31,30,30,30,29,30,29,30],
+  2056:[31,32,31,32,31,30,30,30,29,30,29,30],2057:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2058:[31,31,32,31,31,31,30,29,30,29,30,30],2059:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2060:[31,32,31,32,31,30,30,30,29,30,29,31],2061:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2062:[31,31,32,31,31,31,30,29,30,29,30,30],2063:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2064:[31,31,32,31,31,31,30,29,30,29,30,30],2065:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2066:[31,32,31,32,31,30,30,30,29,30,29,31],2067:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2068:[31,31,32,31,31,31,30,29,30,29,30,30],2069:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2070:[31,31,32,31,31,31,30,29,30,29,30,30],2071:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2072:[31,32,31,32,31,30,30,30,29,30,29,31],2073:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2074:[31,31,32,31,31,31,30,29,30,29,30,30],2075:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2076:[31,32,31,32,31,30,30,30,29,30,29,30],2077:[31,32,31,32,31,30,30,30,29,30,29,30],
+  2078:[31,31,32,31,31,31,30,29,30,29,30,30],2079:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2080:[31,32,31,32,31,30,30,30,29,30,29,31],2081:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2082:[31,31,32,31,31,31,30,29,30,29,30,30],2083:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2084:[31,31,32,31,31,31,30,29,30,29,30,30],2085:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2086:[31,32,31,32,31,30,30,30,29,30,29,31],2087:[31,31,32,31,31,31,30,29,30,29,30,30],
+  2088:[31,31,32,31,31,31,30,29,30,29,30,30],2089:[31,32,31,32,31,30,30,30,29,30,29,31],
+  2090:[31,31,32,31,31,31,30,29,30,29,30,30],
+};
+const NEPALI_MONTHS=["Baishakh","Jestha","Ashadh","Shrawan","Bhadra","Ashwin","Kartik","Mangsir","Poush","Magh","Falgun","Chaitra"];
+const BS_EPOCH=new Date(1943,3,8); // calibrated: verified against confirmed ground truth (Ashadh 5, 2083 = 19 Jun 2026)
+function adToBS(d){
+  let t=Math.floor((d-BS_EPOCH)/86400000);
+  for(let y=2000;y<=2090;y++){
+    if(!BS_DATA[y])break;
+    for(let m=0;m<12;m++){
+      const dim=BS_DATA[y][m];
+      if(t<dim)return{year:y,month:m+1,day:t+1,monthName:NEPALI_MONTHS[m]};
+      t-=dim;
+    }
+  }
+  return null;
+}
+function getCurrentNepaliMonth(){const bs=adToBS(new Date());return bs?bs.monthName:"Baishakh";}
+const currentNepaliMonth=getCurrentNepaliMonth();
+
+const MONTHS=[
+  {name:"Baishakh",nep:"बैशाख"},{name:"Jestha",nep:"जेठ"},{name:"Ashadh",nep:"असार"},
+  {name:"Shrawan",nep:"साउन"},{name:"Bhadra",nep:"भदौ"},{name:"Ashwin",nep:"असोज"},
+  {name:"Kartik",nep:"कार्तिक"},{name:"Mangsir",nep:"मंसिर"},{name:"Poush",nep:"पुष"},
+  {name:"Magh",nep:"माघ"},{name:"Falgun",nep:"फागुन"},{name:"Chaitra",nep:"चैत"},
+];
+
+let cache={},currentMonth=null,currentFamilies=[],currentFilter="all",currentDetailFam=null,confirmCallback=null,currentTypeFilter=null,monthViewState="types";
+
+// ── TOAST ──
+function showToast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg;t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),2500);
+}
+function showSyncBar(show){
+  const b=document.getElementById("sync-bar");
+  show?b.classList.add("show"):b.classList.remove("show");
+}
+
+// ── SWIPE-LEFT-TO-DELETE ──
+let openSwipeContent=null,openSwipeWrapper=null;
+function closeAllSwipes(){
+  if(openSwipeContent){openSwipeContent.style.transform="translateX(0)";}
+  if(openSwipeWrapper)openSwipeWrapper.dataset.open="0";
+  openSwipeContent=null;openSwipeWrapper=null;
+}
+function attachSwipe(wrapperEl,contentEl,revealPx,onTap){
+  let startX=0,startY=0,deltaX=0,dragging=false,horizontal=false;
+  contentEl.addEventListener("touchstart",e=>{
+    startX=e.touches[0].clientX;startY=e.touches[0].clientY;deltaX=0;dragging=true;horizontal=false;
+  },{passive:true});
+  contentEl.addEventListener("touchmove",e=>{
+    if(!dragging)return;
+    const dx=e.touches[0].clientX-startX;
+    const dy=e.touches[0].clientY-startY;
+    if(!horizontal&&Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy))horizontal=true;
+    if(horizontal){
+      deltaX=dx;
+      const base=wrapperEl.dataset.open==="1"?-revealPx:0;
+      let t=base+dx;
+      if(t>0)t=0;if(t<-revealPx)t=-revealPx;
+      contentEl.style.transform=`translateX(${t}px)`;
+      e.preventDefault();
+    }
+  },{passive:false});
+  contentEl.addEventListener("touchend",()=>{
+    dragging=false;
+    if(!horizontal){
+      return; // plain tap/scroll — let normal click handler run
+    }
+    const wasOpen=wrapperEl.dataset.open==="1";
+    const finalDelta=(wasOpen?-revealPx:0)+deltaX;
+    if(finalDelta<-(revealPx/2)){
+      if(openSwipeContent&&openSwipeContent!==contentEl)closeAllSwipes();
+      contentEl.style.transform=`translateX(-${revealPx}px)`;
+      wrapperEl.dataset.open="1";
+      openSwipeContent=contentEl;openSwipeWrapper=wrapperEl;
+    }else{
+      contentEl.style.transform="translateX(0)";
+      wrapperEl.dataset.open="0";
+      if(openSwipeContent===contentEl){openSwipeContent=null;openSwipeWrapper=null;}
+    }
+  });
+  contentEl.addEventListener("click",e=>{
+    if(wrapperEl.dataset.open==="1"){
+      e.stopPropagation();e.preventDefault();
+      closeAllSwipes();
+    }
+  },true);
+}
+
+// ── PERMANENT DELETE ──
+function confirmDeleteFamily(fam){
+  showConfirm(
+    "⚠️ Delete Family Permanently?",
+    `"${fam.headName}" and all ${fam.memberCount||0} members will be PERMANENTLY deleted.\n\nThis cannot be undone, and this family will never be re-uploaded again, even if it appears in a future scraped file.\n\nAre you sure?`,
+    ()=>permanentlyDeleteFamily(fam)
+  );
+}
+
+async function permanentlyDeleteFamily(fam){
+  showSyncBar(true);
+  try{
+    await deleteDoc(doc(db,"months",fam.nepaliMonth,"families",fam.headId));
+    await setDoc(doc(db,"deletedFamilies",fam.headId),{
+      insuranceNo: fam.headId,
+      headName: fam.headName||"",
+      deletedFromMonth: fam.nepaliMonth||""
+    });
+    if(cache[fam.nepaliMonth])cache[fam.nepaliMonth]=cache[fam.nepaliMonth].filter(f=>f.headId!==fam.headId);
+    updateMonthBadge(fam.nepaliMonth);
+    saveToLocal();
+    showSyncBar(false);
+    showToast("🗑️ Family permanently deleted");
+    if(document.getElementById("search-results").style.display==="block"){
+      performSearch(document.getElementById("search-input").value);
+    }else{
+      renderTypeGrid();
+      if(monthViewState==="list")renderMonthList(currentFilter);
+    }
+  }catch(e){
+    showSyncBar(false);
+    showToast("❌ Error: "+e.message);
+  }
+}
+
+function confirmIgnoreFamily(fam){
+  if(fam.ignored){
+    toggleIgnoreFamily(fam); // restoring needs no confirmation
+    return;
+  }
+  showConfirm(
+    "🙈 Ignore Family?",
+    `"${fam.headName}" will be hidden from the Paid/Unpaid lists until you restore them. Their data stays safe — nothing is deleted.\n\nAre you sure?`,
+    ()=>toggleIgnoreFamily(fam)
+  );
+}
+
+async function toggleIgnoreFamily(fam){
+  const newIgnored=!fam.ignored;
+  showSyncBar(true);
+  try{
+    await updateDoc(doc(db,"months",fam.nepaliMonth,"families",fam.headId),{ignored:newIgnored});
+    fam.ignored=newIgnored;
+    if(cache[fam.nepaliMonth]){
+      const idx=cache[fam.nepaliMonth].findIndex(f=>f.headId===fam.headId);
+      if(idx!==-1)cache[fam.nepaliMonth][idx]=fam;
+    }
+    saveToLocal();
+    showSyncBar(false);
+    showToast(newIgnored?"🙈 Family ignored":"↩️ Family restored");
+    if(document.getElementById("search-results").style.display==="block"){
+      performSearch(document.getElementById("search-input").value);
+    }else{
+      renderMonthList(currentFilter);
+    }
+  }catch(e){
+    showSyncBar(false);
+    showToast("❌ Error: "+e.message);
+  }
+}
+
+let moveTargetFam=null;
+function openMoveModal(fam){
+  moveTargetFam=fam;
+  document.getElementById("move-fam-name").textContent=`"${fam.headName||""}"`;
+  const grid=document.getElementById("move-month-grid");
+  grid.innerHTML="";
+  for(const m of MONTHS){
+    const btn=document.createElement("div");
+    btn.className="move-month-btn"+(m.name===fam.nepaliMonth?" current":"");
+    btn.textContent=m.nep;
+    btn.onclick=()=>selectMoveMonth(m.name,m.nep);
+    grid.appendChild(btn);
+  }
+  document.getElementById("move-overlay").classList.add("open");
+}
+window.closeMoveModal=function(){
+  document.getElementById("move-overlay").classList.remove("open");
+  moveTargetFam=null;
+};
+function selectMoveMonth(newMonth,newMonthNep){
+  const fam=moveTargetFam;
+  if(!fam)return;
+  closeMoveModal();
+  if(newMonth===fam.nepaliMonth){showToast("Already in that month");return;}
+  showConfirm(
+    "📅 Move Family?",
+    `Move "${fam.headName}" from ${fam.nepaliMonth} to ${newMonthNep}?`,
+    ()=>moveFamilyToMonth(fam,newMonth)
+  );
+}
+async function moveFamilyToMonth(fam,newMonth){
+  showSyncBar(true);
+  const oldMonth=fam.nepaliMonth;
+  try{
+    const oldRef=doc(db,"months",oldMonth,"families",fam.headId);
+    const newRef=doc(db,"months",newMonth,"families",fam.headId);
+    const updatedFam={...fam,nepaliMonth:newMonth};
+    delete updatedFam.id;
+    await setDoc(newRef,updatedFam);
+    await deleteDoc(oldRef);
+    if(cache[oldMonth])cache[oldMonth]=cache[oldMonth].filter(f=>f.headId!==fam.headId);
+    if(!cache[newMonth])cache[newMonth]=[];
+    const newFamObj={...updatedFam,id:fam.headId};
+    cache[newMonth].push(newFamObj);
+    updateMonthBadge(oldMonth);updateMonthBadge(newMonth);
+    saveToLocal();
+    showSyncBar(false);
+    showToast(`✅ Moved to ${newMonth}`);
+    if(document.getElementById("search-results").style.display==="block"){
+      performSearch(document.getElementById("search-input").value);
+    }else if(currentMonth&&currentMonth.name===oldMonth){
+      renderTypeGrid();
+      if(monthViewState==="list")renderMonthList(currentFilter);
+    }
+  }catch(e){
+    showSyncBar(false);
+    showToast("❌ Error: "+e.message);
+  }
+}
+
+window.openAddMemberModal=function(){
+  document.getElementById("am-name").value="";
+  document.getElementById("am-imis").value="";
+  document.getElementById("am-role").value="";
+  document.getElementById("am-phone").value="";
+  document.getElementById("am-status").value="";
+  document.getElementById("am-error").textContent="";
+  document.getElementById("add-member-overlay").classList.add("open");
+};
+window.closeAddMemberModal=function(){
+  document.getElementById("add-member-overlay").classList.remove("open");
+};
+window.submitAddMember=async function(){
+  const fam=currentDetailFam;
+  if(!fam)return;
+  const name=document.getElementById("am-name").value.trim();
+  const imis=document.getElementById("am-imis").value.trim();
+  const role=document.getElementById("am-role").value.trim();
+  const phone=document.getElementById("am-phone").value.trim();
+  const status=document.getElementById("am-status").value;
+  const errEl=document.getElementById("am-error");
+
+  if(!name){errEl.textContent="Name is required";return;}
+  if(!imis){errEl.textContent="IMIS number is required";return;}
+  if(!/^\d{9}$/.test(imis)){errEl.textContent="IMIS number must be 9 digits";return;}
+  if((fam.members||[]).some(m=>m.id===imis)){errEl.textContent="This IMIS number is already in this family";return;}
+  errEl.textContent="";
+
+  showSyncBar(true);
+  try{
+    const newMember={id:imis,name:name,role:role,phone:phone,photoUrl:"",status:status};
+    const updatedMembers=[...(fam.members||[]),newMember];
+    await updateDoc(doc(db,"months",fam.nepaliMonth,"families",fam.headId),{
+      members: updatedMembers,
+      memberCount: updatedMembers.length
+    });
+    fam.members=updatedMembers;fam.memberCount=updatedMembers.length;
+    if(cache[fam.nepaliMonth]){
+      const idx=cache[fam.nepaliMonth].findIndex(f=>f.headId===fam.headId);
+      if(idx!==-1)cache[fam.nepaliMonth][idx]=fam;
+    }
+    saveToLocal();
+    showSyncBar(false);
+    closeAddMemberModal();
+    showToast("✅ Member added");
+    openDetail(fam);
+  }catch(e){
+    showSyncBar(false);
+    errEl.textContent="❌ Error: "+e.message;
+  }
+};
+
+function confirmDeleteMember(fam,member,isHead){
+  if(isHead){
+    showToast("⚠️ To remove the head, delete the whole family instead");
+    return;
+  }
+  showConfirm(
+    "⚠️ Delete Member Permanently?",
+    `"${member.name}" will be PERMANENTLY removed from this family.\n\nThis cannot be undone, and they will never be re-added again, even if they appear in a future scraped file.\n\nAre you sure?`,
+    ()=>permanentlyDeleteMember(fam,member)
+  );
+}
+
+async function permanentlyDeleteMember(fam,member){
+  showSyncBar(true);
+  try{
+    const remaining=(fam.members||[]).filter(m=>m.id!==member.id);
+    await updateDoc(doc(db,"months",fam.nepaliMonth,"families",fam.headId),{
+      members: remaining,
+      memberCount: remaining.length
+    });
+    await setDoc(doc(db,"deletedMembers",member.id),{
+      insuranceNo: member.id,
+      name: member.name||"",
+      deletedFromFamily: fam.headId||""
+    });
+    fam.members=remaining;fam.memberCount=remaining.length;
+    if(cache[fam.nepaliMonth]){
+      const idx=cache[fam.nepaliMonth].findIndex(f=>f.headId===fam.headId);
+      if(idx!==-1)cache[fam.nepaliMonth][idx]=fam;
+    }
+    saveToLocal();
+    showSyncBar(false);
+    showToast("🗑️ Member permanently deleted");
+    openDetail(fam);
+  }catch(e){
+    showSyncBar(false);
+    showToast("❌ Error: "+e.message);
+  }
+}
+
+// ── CONFIRM ──
+function showConfirm(title,msg,onConfirm){
+  document.getElementById("confirm-title").textContent=title;
+  document.getElementById("confirm-msg").textContent=msg;
+  confirmCallback=onConfirm;
+  document.getElementById("confirm-overlay").classList.add("open");
+}
+window.closeConfirm=function(){
+  document.getElementById("confirm-overlay").classList.remove("open");
+  confirmCallback=null;
+};
+document.getElementById("confirm-ok-btn").onclick=function(){
+  document.getElementById("confirm-overlay").classList.remove("open");
+  if(confirmCallback)confirmCallback();
+  confirmCallback=null;
+};
+
+// ── AUTH ──
+window.doLogin=async function(){
+  const email=document.getElementById("login-email").value.trim();
+  const pass=document.getElementById("login-pass").value;
+  const btn=document.getElementById("login-btn");
+  const err=document.getElementById("login-error");
+  err.textContent="";
+  btn.disabled=true;btn.textContent="Logging in...";
+  try{
+    await signInWithEmailAndPassword(auth,email,pass);
+    // Clear form on success
+    document.getElementById("login-email").value="";
+    document.getElementById("login-pass").value="";
+    btn.textContent="Login";
+  }catch(e){
+    err.textContent="Wrong email or password!";
+    btn.disabled=false;btn.textContent="Login";
+  }
+};
+
+window.doLogout=async function(){
+  await signOut(auth);
+};
+
+// Login button click
+document.getElementById("login-btn").addEventListener("click", window.doLogin);
+
+// Logout button click
+document.getElementById("logout-btn").addEventListener("click", window.doLogout);
+
+// Enter key login
+document.getElementById("login-pass").addEventListener("keydown",e=>{
+  if(e.key==="Enter")window.doLogin();
+});
+
+// ── AUTH STATE ──
+onAuthStateChanged(auth,async(user)=>{
+  const splash=document.getElementById("splash");
+  const loginScreen=document.getElementById("login-screen");
+
+  if(user){
+    // Logged in — show UI immediately
+    loginScreen.classList.add("hide");
+    splash.classList.add("hide");
+    splash.style.display="none";
+    buildMonthGrid();
+    const curObj=MONTHS.find(m=>m.name===currentNepaliMonth);
+    if(curObj)document.getElementById("current-month-label").textContent=`📅 Current: ${curObj.nep} (${currentNepaliMonth})`;
+    showPage("page-home");
+    // Load data in background
+    preloadAllData().then(()=>{ updateAllBadges(); }).catch(e=>{ showToast("⚠️ "+e.message); });
+  }else{
+    // Not logged in
+    splash.style.display="none";
+    loginScreen.classList.remove("hide");
+  }
+});
+
+// ── COPY TEXT (insurance number etc.) ──
+window.copyText=function(text){
+  if(!text)return;
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(()=>showToast("📋 Copied: "+text));
+  }else{
+    const el=document.createElement("textarea");
+    el.value=text;document.body.appendChild(el);el.select();
+    document.execCommand("copy");document.body.removeChild(el);
+    showToast("📋 Copied: "+text);
+  }
+};
+
+// ── TAP-AGAIN-TO-CALL ──
+window.handlePhoneTap=function(phone,el,evt){
+  if(!phone||phone==="—"){
+    if(evt)evt.preventDefault();
+    return false;
+  }
+  const now=Date.now();
+  const last=parseInt(el.dataset.tapTime||"0",10);
+  if(now-last<3000){
+    el.dataset.tapTime="0";
+    return true; // second tap: let the native tel: link actually dial
+  }else{
+    el.dataset.tapTime=String(now);
+    showToast("📞 Touch again to call");
+    setTimeout(()=>{if(el.dataset.tapTime===String(now))el.dataset.tapTime="0";},3000);
+    if(evt)evt.preventDefault();
+    return false; // first tap: just show the hint, don't dial yet
+  }
+};
+
+// ── LOCAL STORAGE CACHE ──
+const LS_KEY = "hib_cache_v1";
+function saveToLocal(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(cache)); }catch(e){}
+}
+function loadFromLocal(){
+  try{
+    const d = localStorage.getItem(LS_KEY);
+    if(d){ Object.assign(cache, JSON.parse(d)); return true; }
+  }catch(e){}
+  return false;
+}
+
+// ── PRELOAD ──
+async function preloadAllData(){
+  // First load from localStorage so UI works offline immediately
+  const hadLocal = loadFromLocal();
+  if(hadLocal){ buildMonthGrid(); updateAllBadges(); }
+
+  // Then try to fetch fresh data from Firestore
+  const isOnline = navigator.onLine;
+  if(!isOnline){
+    if(!hadLocal) showToast("⚠️ Offline - no saved data found");
+    else showToast("📴 Offline - showing saved data");
+    return;
+  }
+
+  showToast("🔄 Syncing fresh data...");
+  let anyLoaded = false;
+  await Promise.all(MONTHS.map(async(m)=>{
+    try{
+      const snap=await getDocs(collection(db,"months",m.name,"families"));
+      cache[m.name]=snap.docs.map(d=>({id:d.id,...d.data()}));
+      for(const fam of cache[m.name])
+        for(const mem of(fam.members||[]))
+          if(mem.photoUrl){const img=new Image();img.src=mem.photoUrl;}
+      anyLoaded = true;
+    }catch(e){ /* keep local cache for this month */ }
+  }));
+  if(anyLoaded){
+    saveToLocal();
+    updateAllBadges();
+    showToast("✅ Data updated!");
+  }
+}
+
+// ── MONTH GRID ──
+function buildMonthGrid(){
+  const grid=document.getElementById("month-grid");
+  grid.innerHTML="";
+  for(const m of MONTHS){
+    const btn=document.createElement("div");
+    btn.className="month-btn"+(m.name===currentNepaliMonth?" current-month":"");
+    btn.id="month-btn-"+m.name;
+    btn.innerHTML=`<div class="month-nep">${m.nep}</div><div class="month-eng">${m.name}${m.name===currentNepaliMonth?" 📍":""}</div><div class="month-count" id="count-${m.name}">—</div>`;
+    btn.onclick=()=>openMonth(m);
+    grid.appendChild(btn);
+  }
+  updateAllBadges();
+}
+function updateAllBadges(){for(const m of MONTHS)if(cache[m.name])updateMonthBadge(m.name);}
+
+function openMonth(m){
+  currentMonth=m;currentFilter="all";currentTypeFilter=null;
+  document.getElementById("month-title").textContent=`${m.nep} — ${m.name}`;
+  currentFamilies=cache[m.name]||[];
+  renderTypeGrid();
+  showMonthView("types");
+  showPage("page-month");
+}
+
+const CATEGORY_ORDER=["Normal","FCHV","Ultra Poor","HIV"];
+function renderTypeGrid(){
+  const counts={};
+  for(const f of currentFamilies){
+    const t=f.familyType||"Unknown";
+    counts[t]=(counts[t]||0)+1;
+  }
+  const grid=document.getElementById("type-grid");
+  grid.innerHTML="";
+  const types=Object.keys(counts).sort((a,b)=>{
+    const ai=CATEGORY_ORDER.findIndex(c=>c.toLowerCase()===a.toLowerCase());
+    const bi=CATEGORY_ORDER.findIndex(c=>c.toLowerCase()===b.toLowerCase());
+    const aRank=ai===-1?CATEGORY_ORDER.length:ai;
+    const bRank=bi===-1?CATEGORY_ORDER.length:bi;
+    if(aRank!==bRank)return aRank-bRank;
+    return a.localeCompare(b);
+  });
+  if(!types.length){grid.innerHTML=`<div class="empty" style="grid-column:span 2">No families found</div>`;return;}
+  for(const t of types){
+    const btn=document.createElement("div");
+    btn.className="month-btn";
+    btn.innerHTML=`<div class="month-nep">${t}</div><div class="month-count">${counts[t]} families</div>`;
+    btn.onclick=()=>openType(t);
+    grid.appendChild(btn);
+  }
+}
+
+function openType(t){
+  currentTypeFilter=t;currentFilter="all";
+  document.querySelectorAll("#month-list-section .tab").forEach(el=>el.classList.remove("active"));
+  document.querySelector("#month-list-section .tab").classList.add("active");
+  renderMonthList("all");
+  showMonthView("list");
+}
+
+function showMonthView(state){
+  monthViewState=state;
+  document.getElementById("type-grid-section").style.display=state==="types"?"":"none";
+  document.getElementById("month-list-section").style.display=state==="list"?"":"none";
+  document.getElementById("month-back-btn").textContent=state==="list"?"← Back to Categories":"← Back to Months";
+}
+
+window.monthBack=function(){
+  if(monthViewState==="list"){renderTypeGrid();showMonthView("types");}
+  else{goHome();}
+};
+
+function renderMonthList(filter){
+  currentFilter=filter;
+  const list=document.getElementById("month-family-list");
+  let typeFamilies=currentFamilies.filter(f=>(f.familyType||"Unknown")===currentTypeFilter);
+  const activeFamilies=typeFamilies.filter(f=>!f.ignored);
+  const ignoredFamilies=typeFamilies.filter(f=>f.ignored);
+
+  let filtered;
+  if(filter==="ignored")filtered=ignoredFamilies;
+  else if(filter==="paid")filtered=activeFamilies.filter(f=>f.paid);
+  else if(filter==="unpaid")filtered=activeFamilies.filter(f=>!f.paid);
+  else filtered=activeFamilies;
+
+  const total=activeFamilies.length;
+  const paid=activeFamilies.filter(f=>f.paid).length;
+  const unpaid=total-paid;
+  document.getElementById("month-overview").innerHTML=`<strong>${currentMonth.nep} · ${currentTypeFilter}</strong> &nbsp;|&nbsp; Total: <strong>${total}</strong> &nbsp;|&nbsp; ✅ Paid: <strong style="color:#22a05a">${paid}</strong> &nbsp;|&nbsp; ❌ Unpaid: <strong style="color:#e03535">${unpaid}</strong> &nbsp;|&nbsp; 🙈 Ignored: <strong style="color:#888">${ignoredFamilies.length}</strong>`;
+  if(!filtered.length){list.innerHTML=`<div class="empty">No families found</div>`;return;}
+  list.innerHTML="";
+  for(const fam of filtered){
+    const headMember=(fam.members||[]).find(m=>m.id===fam.headId)||(fam.members||[])[0];
+    const photoUrl=headMember?.photoUrl||"";
+    const isPaid=fam.paid||false;
+    const card=document.createElement("div");
+    card.className=`family-card ${isPaid?"paid":"unpaid"}`;
+    card.innerHTML=`
+      ${photoUrl?`<img class="family-photo" src="${photoUrl}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ""}
+      <div class="family-photo-placeholder" ${photoUrl?'style="display:none"':""}>👤</div>
+      <div class="card-info">
+        <div class="card-top"><div class="family-name">${fam.headName||"Unknown"}${fam.ignored?' <span style="color:#888;font-size:11px;">(Ignored)</span>':""}</div><div class="paid-check ${isPaid?"checked":""}">${isPaid?"✓":""}</div></div>
+        <div class="family-id">ID: ${fam.headId||""}</div>
+        <div class="family-info">${fam.memberCount||0} members · ${fam.familyType||""}</div>
+      </div>`;
+    card.onclick=()=>openDetail(fam);
+    const checkEl=card.querySelector(".paid-check");
+    checkEl.onclick=(e)=>{e.stopPropagation();handlePaidClick(fam,checkEl);};
+
+    const wrapper=document.createElement("div");
+    wrapper.className="swipe-wrapper";
+    wrapper.dataset.open="0";
+    const moveBtn=document.createElement("div");
+    moveBtn.className="swipe-move-btn";
+    moveBtn.innerHTML=`<span>📅</span><span>Move</span>`;
+    moveBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();openMoveModal(fam);};
+    const ignoreBtn=document.createElement("div");
+    ignoreBtn.className="swipe-ignore-btn";
+    ignoreBtn.innerHTML=fam.ignored?`<span>↩️</span><span>Restore</span>`:`<span>🙈</span><span>Ignore</span>`;
+    ignoreBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmIgnoreFamily(fam);};
+    const delBtn=document.createElement("div");
+    delBtn.className="swipe-delete-btn";
+    delBtn.innerHTML=`<span>🗑️</span><span>Delete</span>`;
+    delBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmDeleteFamily(fam);};
+    wrapper.appendChild(moveBtn);
+    wrapper.appendChild(ignoreBtn);
+    wrapper.appendChild(delBtn);
+    wrapper.appendChild(card);
+    attachSwipe(wrapper,card,228);
+    list.appendChild(wrapper);
+  }
+}
+
+function openDetail(fam){
+  currentDetailFam=fam;
+  document.getElementById("detail-title").textContent=fam.headName||"Family";
+  const headMember=(fam.members||[]).find(m=>m.id===fam.headId)||(fam.members||[])[0];
+  const photoUrl=headMember?.photoUrl||"";
+  const isPaid=fam.paid||false;
+  const isCurrentMonth=fam.nepaliMonth===currentNepaliMonth;
+  document.getElementById("detail-header").innerHTML=`
+    <div class="detail-header">
+      ${photoUrl?`<img class="detail-photo" src="${photoUrl}" alt="" onclick="openPhoto('${photoUrl}','${fam.headName}','Head of Family')" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ""}
+      <div class="detail-photo-placeholder" ${photoUrl?'style="display:none"':""}>👤</div>
+      <div class="detail-info">
+        <div class="detail-name">${fam.headName||""}</div>
+        <div class="detail-meta">ID: ${fam.headId||""}</div>
+        <div class="detail-meta">Registered: ${fam.registrationDateAD||""}</div>
+        <div class="detail-badges">
+          <span class="dbadge dbadge-month">📅 ${fam.nepaliMonth||""} ${fam.bsYear||""}</span>
+          <span class="dbadge dbadge-type">${fam.familyType||"Normal"}</span>
+          ${!isCurrentMonth?`<span class="dbadge" style="background:#fff3cd;color:#856404;">⚠️ Late payment</span>`:""}
+        </div>
+      </div>
+    </div>`;
+  const membersList=document.getElementById("members-list");
+  membersList.innerHTML="";
+  for(const m of(fam.members||[])){
+    const isHead=m.id===fam.headId;
+    const statusClass=(m.status||"").toLowerCase()==="active"?"status-active":((m.status||"").toLowerCase()==="inactive"?"status-inactive":"");
+    const row=document.createElement("div");
+    row.className=`member-row ${statusClass}`;
+    row.innerHTML=`
+      ${m.photoUrl?`<img class="member-photo" src="${m.photoUrl}" alt="" onclick="openPhoto('${m.photoUrl}','${m.name}','${m.role||'Head'}')" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ""}
+      <div class="member-photo-placeholder" ${m.photoUrl?'style="display:none"':""}>👤</div>
+      <div class="member-info">
+        <div class="m-name">${m.name||""} ${isHead?"⭐":""}</div>
+        <div class="m-role">${m.role||"Head"}</div>
+        <div class="m-id" onclick="copyText('${m.id||""}')">${m.id||""}</div>
+      </div>
+      <a class="m-phone" href="tel:${m.phone||''}" onclick="return handlePhoneTap('${m.phone||''}',this,event)">${m.phone||"—"}</a>`;
+
+    const mwrapper=document.createElement("div");
+    mwrapper.className="swipe-wrapper-member";
+    mwrapper.dataset.open="0";
+    const mDelBtn=document.createElement("div");
+    mDelBtn.className="swipe-delete-btn";
+    mDelBtn.style.width="64px";
+    mDelBtn.innerHTML=`<span>🗑️</span>`;
+    mDelBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmDeleteMember(fam,m,isHead);};
+    mwrapper.appendChild(mDelBtn);
+    mwrapper.appendChild(row);
+    attachSwipe(mwrapper,row,64);
+    membersList.appendChild(mwrapper);
+  }
+  const historySection=document.getElementById("enrol-history-section");
+  const history=fam.enrolHistory||[];
+  if(history.length){
+    let rows="";
+    history.forEach((h,i)=>{
+      rows+=`<tr><td>${i+1}</td><td>${h.date||""}</td><td>${h.assistant||""}</td></tr>`;
+    });
+    historySection.innerHTML=`
+      <div class="history-title">📋 ENROLMENT HISTORY</div>
+      <table class="history-table">
+        <tr><th>S.No.</th><th>Enroll Date</th><th>Enrolment Assistant</th></tr>
+        ${rows}
+      </table>`;
+  }else{
+    historySection.innerHTML="";
+  }
+  showPage("page-detail");
+}
+
+window.handlePaidClick=function(fam,checkEl){
+  const newPaid=!fam.paid;
+  const isLate=fam.nepaliMonth!==currentNepaliMonth;
+  if(newPaid&&isLate){
+    showConfirm("⚠️ Move Family?",`"${fam.headName}" was in ${fam.nepaliMonth} but not paid.\n\nWill move to ${currentNepaliMonth} and mark paid.\n\nAre you sure?`,()=>doTogglePaid(fam,checkEl));
+    return;
+  }
+  doTogglePaid(fam,checkEl);
+};
+
+async function doTogglePaid(fam,checkEl){
+  const newPaid=!fam.paid;
+  if(checkEl)checkEl.classList.add("saving");
+  showSyncBar(true);
+  const today=new Date();
+  const paidDate=newPaid?today.toISOString():null;
+  const todayStr=`${today.getDate()}/${today.getMonth()+1}/${today.getFullYear()}`;
+  const oldMonth=fam.nepaliMonth;
+  const needsMove=newPaid&&(oldMonth!==currentNepaliMonth);
+  try{
+    if(needsMove){
+      const oldRef=doc(db,"months",oldMonth,"families",fam.headId);
+      const newRef=doc(db,"months",currentNepaliMonth,"families",fam.headId);
+      const bs=adToBS(today);
+      const updatedFam={...fam,paid:true,paidDate,nepaliMonth:currentNepaliMonth,bsYear:bs?bs.year:fam.bsYear,registrationDateAD:todayStr};
+      delete updatedFam.id;
+      setDoc(newRef,updatedFam).then(()=>deleteDoc(oldRef)).then(()=>{showSyncBar(false);showToast(`✅ Moved to ${currentNepaliMonth}!`);}).catch(e=>{showSyncBar(false);showToast("❌ Error: "+e.message);});
+      if(cache[oldMonth])cache[oldMonth]=cache[oldMonth].filter(f=>f.headId!==fam.headId);
+      if(!cache[currentNepaliMonth])cache[currentNepaliMonth]=[];
+      const newFamObj={...updatedFam,id:fam.headId};
+      cache[currentNepaliMonth].push(newFamObj);
+      if(currentDetailFam&&currentDetailFam.headId===fam.headId)currentDetailFam=newFamObj;
+      updateMonthBadge(oldMonth);updateMonthBadge(currentNepaliMonth);
+      saveToLocal();
+    }else{
+      const docRef=doc(db,"months",oldMonth,"families",fam.headId);
+      updateDoc(docRef,{paid:newPaid,paidDate}).then(()=>{showSyncBar(false);showToast(newPaid?"✅ Marked Paid":"❌ Marked Unpaid");}).catch(e=>{showSyncBar(false);showToast("❌ Error: "+e.message);});
+      fam.paid=newPaid;fam.paidDate=paidDate;
+      if(cache[oldMonth]){const idx=cache[oldMonth].findIndex(f=>f.headId===fam.headId);if(idx!==-1)cache[oldMonth][idx]=fam;}
+      updateMonthBadge(oldMonth);
+      saveToLocal();
+    }
+    if(document.getElementById("search-results").style.display==="block"){
+      performSearch(document.getElementById("search-input").value);
+    }else{
+      renderMonthList(currentFilter);
+    }
+  }catch(e){
+    showSyncBar(false);
+    if(checkEl)checkEl.classList.remove("saving");
+    showToast("❌ Error: "+e.message);
+  }
+}
+
+function updateMonthBadge(monthName){
+  const families=cache[monthName]||[];
+  const unpaid=families.filter(f=>!f.paid).length;
+  const total=families.length;
+  const countEl=document.getElementById("count-"+monthName);
+  const btn=document.getElementById("month-btn-"+monthName);
+  if(countEl)countEl.textContent=`${total} families`;
+  if(btn){
+    const ex=btn.querySelector(".month-badge");if(ex)ex.remove();
+    if(unpaid>0){const badge=document.createElement("div");badge.className="month-badge";badge.textContent=unpaid;btn.appendChild(badge);}
+  }
+}
+
+// ── SEARCH (debounced — only runs ~280ms after typing pauses, so the
+// keyboard never freezes while results are being built) ──
+let searchDebounceTimer=null;
+window.handleSearch=function(query){
+  const resultsEl=document.getElementById("search-results");
+  const monthSection=document.getElementById("month-grid-section");
+  if(searchDebounceTimer){clearTimeout(searchDebounceTimer);searchDebounceTimer=null;}
+  if(!query.trim()){resultsEl.style.display="none";monthSection.style.display="";return;}
+  resultsEl.style.display="block";monthSection.style.display="none";
+  document.getElementById("search-list").innerHTML='<div class="loading"><div class="spinner"></div> Searching...</div>';
+  searchDebounceTimer=setTimeout(()=>performSearch(query),280);
+};
+
+window.performSearch=function(query){
+  const q=query.toLowerCase();const results=[];
+  for(const m of MONTHS){
+    for(const fam of(cache[m.name]||[])){
+      if((fam.headName||"").toLowerCase().includes(q)||(fam.headId||"").includes(q)||(fam.members||[]).some(mem=>(mem.name||"").toLowerCase().includes(q)||(mem.phone||"").includes(q)||(mem.id||"").includes(q)))results.push(fam);
+    }
+  }
+  document.getElementById("search-count").textContent=`${results.length} result(s) found`;
+  const listEl=document.getElementById("search-list");listEl.innerHTML="";
+  if(!results.length){listEl.innerHTML=`<div class="empty">No results</div>`;return;}
+  const LIMIT=60;
+  const shown=results.slice(0,LIMIT);
+  for(const fam of shown){
+    const headMember=(fam.members||[]).find(m=>m.id===fam.headId)||(fam.members||[])[0];
+    const photoUrl=headMember?.photoUrl||"";const isPaid=fam.paid||false;
+    const card=document.createElement("div");card.className=`family-card ${isPaid?"paid":"unpaid"}`;
+    card.innerHTML=`
+      ${photoUrl?`<img class="family-photo" src="${photoUrl}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ""}
+      <div class="family-photo-placeholder" ${photoUrl?'style="display:none"':""}>👤</div>
+      <div class="card-info">
+        <div class="card-top"><div class="family-name">${fam.headName||""}${fam.ignored?' <span style="color:#888;font-size:11px;">(Ignored)</span>':""}</div><div class="paid-check ${isPaid?"checked":""}">${isPaid?"✓":""}</div></div>
+        <div class="family-id">ID: ${fam.headId||""} · ${fam.nepaliMonth||""}</div>
+        <div class="family-info">${fam.memberCount||0} members</div>
+      </div>`;
+    card.onclick=()=>openDetail(fam);
+    const checkEl=card.querySelector(".paid-check");
+    checkEl.onclick=(e)=>{e.stopPropagation();handlePaidClick(fam,checkEl);};
+
+    const wrapper=document.createElement("div");
+    wrapper.className="swipe-wrapper";
+    wrapper.dataset.open="0";
+    const moveBtn=document.createElement("div");
+    moveBtn.className="swipe-move-btn";
+    moveBtn.innerHTML=`<span>📅</span><span>Move</span>`;
+    moveBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();openMoveModal(fam);};
+    const ignoreBtn=document.createElement("div");
+    ignoreBtn.className="swipe-ignore-btn";
+    ignoreBtn.innerHTML=fam.ignored?`<span>↩️</span><span>Restore</span>`:`<span>🙈</span><span>Ignore</span>`;
+    ignoreBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmIgnoreFamily(fam);};
+    const delBtn=document.createElement("div");
+    delBtn.className="swipe-delete-btn";
+    delBtn.innerHTML=`<span>🗑️</span><span>Delete</span>`;
+    delBtn.onclick=(e)=>{e.stopPropagation();closeAllSwipes();confirmDeleteFamily(fam);};
+    wrapper.appendChild(moveBtn);
+    wrapper.appendChild(ignoreBtn);
+    wrapper.appendChild(delBtn);
+    wrapper.appendChild(card);
+    attachSwipe(wrapper,card,228);
+    listEl.appendChild(wrapper);
+  }
+  if(results.length>LIMIT){
+    const more=document.createElement("div");
+    more.className="empty";
+    more.textContent=`Showing first ${LIMIT} of ${results.length} — type more to narrow it down`;
+    listEl.appendChild(more);
+  }
+};
+
+window.filterCards=function(filter,el){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  el.classList.add("active");renderMonthList(filter);
+};
+
+function showPage(id){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));document.getElementById(id).classList.add("active");}
+window.goHome=function(){showPage("page-home");};
+window.goMonth=function(){showPage("page-month");};
+
+window.openPhoto=function(url,name,role){
+  document.getElementById("photo-modal-img").src=url;
+  document.getElementById("photo-modal-name").textContent=name;
+  document.getElementById("photo-modal-role").textContent=role;
+  document.getElementById("photo-modal").classList.add("open");
+};
+window.closePhoto=function(){document.getElementById("photo-modal").classList.remove("open");};
+
+let homeQrScanner=null;
+window.openHomeQR=function(){
+  document.getElementById("home-qr-modal").classList.add("open");
+  homeQrScanner=new Html5Qrcode("home-qr-reader");
+  homeQrScanner.start({facingMode:"environment"},{fps:10,qrbox:220},(text)=>{
+    closeHomeQR();
+    document.getElementById("search-input").value=text.trim();
+    document.getElementById("search-results").style.display="block";
+    document.getElementById("month-grid-section").style.display="none";
+    performSearch(text.trim());
+  }).catch(()=>closeHomeQR());
+};
+window.closeHomeQR=function(){
+  if(homeQrScanner){homeQrScanner.stop().catch(()=>{});homeQrScanner=null;}
+  document.getElementById("home-qr-modal").classList.remove("open");
+};
+
+window.handleAndroidBack=function(){
+  const p=document.querySelector('.page.active');
+  if(p&&p.id==='page-detail'){goMonth();return true;}
+  if(p&&p.id==='page-month'){monthBack();return true;}
+  return false;
+};
+</script>
+</body>
+</html>
