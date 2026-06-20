@@ -99,7 +99,7 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 .m-name { font-weight: 600; font-size: 14px; }
 .m-role { color: #1a3a6b; font-size: 12px; margin-top: 2px; font-weight: 600; }
 .m-id { color: #777; font-size: 11px; font-family: monospace; margin-top: 1px; }
-.m-phone { font-size: 12px; color: #1a3a6b; text-align: right; white-space: nowrap; cursor: pointer; padding: 4px 8px; border-radius: 4px; background: #eef2ff; }
+.m-phone { font-size: 12px; color: #1a3a6b; text-align: right; white-space: nowrap; cursor: pointer; padding: 4px 8px; border-radius: 4px; background: #eef2ff; text-decoration: none; display: inline-block; }
 .m-phone:active { background: #d0d9f0; }
 
 .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
@@ -699,17 +699,22 @@ window.copyText=function(text){
 };
 
 // ── TAP-AGAIN-TO-CALL ──
-window.handlePhoneTap=function(phone,el){
-  if(!phone||phone==="—")return;
+window.handlePhoneTap=function(phone,el,evt){
+  if(!phone||phone==="—"){
+    if(evt)evt.preventDefault();
+    return false;
+  }
   const now=Date.now();
   const last=parseInt(el.dataset.tapTime||"0",10);
   if(now-last<3000){
     el.dataset.tapTime="0";
-    window.location.href="tel:"+phone;
+    return true; // second tap: let the native tel: link actually dial
   }else{
     el.dataset.tapTime=String(now);
     showToast("📞 Touch again to call");
     setTimeout(()=>{if(el.dataset.tapTime===String(now))el.dataset.tapTime="0";},3000);
+    if(evt)evt.preventDefault();
+    return false; // first tap: just show the hint, don't dial yet
   }
 };
 
@@ -921,7 +926,7 @@ function openDetail(fam){
         <div class="m-role">${m.role||"Head"}</div>
         <div class="m-id" onclick="copyText('${m.id||""}')">${m.id||""}</div>
       </div>
-      <div class="m-phone" onclick="handlePhoneTap('${m.phone||''}',this)">${m.phone||"—"}</div>`;
+      <a class="m-phone" href="tel:${m.phone||''}" onclick="return handlePhoneTap('${m.phone||''}',this,event)">${m.phone||"—"}</a>`;
 
     const mwrapper=document.createElement("div");
     mwrapper.className="swipe-wrapper-member";
