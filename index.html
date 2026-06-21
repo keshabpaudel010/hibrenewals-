@@ -1159,7 +1159,9 @@ function updateMonthBadge(monthName){
 
 window.closeSearchResults=function(){
   document.getElementById("search-input").value="";
+  document.getElementById("search-input").placeholder="Search...";
   document.querySelectorAll(".category-chip").forEach(c=>c.classList.remove("active-chip"));
+  activeCategoryFilter=null;
   if(searchDebounceTimer){clearTimeout(searchDebounceTimer);searchDebounceTimer=null;}
   document.getElementById("search-results").style.display="none";
   document.getElementById("month-grid-section").style.display="";
@@ -1196,41 +1198,43 @@ function renderCategoryChips(){
 window.browseCategory=function(type,chipEl){
   document.querySelectorAll(".category-chip").forEach(c=>c.classList.remove("active-chip"));
   if(chipEl)chipEl.classList.add("active-chip");
+  activeCategoryFilter=type;
   document.getElementById("search-input").value="";
+  document.getElementById("search-input").placeholder=`Search within ${type}...`;
   if(searchDebounceTimer){clearTimeout(searchDebounceTimer);searchDebounceTimer=null;}
 
   const resultsEl=document.getElementById("search-results");
   const monthSection=document.getElementById("month-grid-section");
   resultsEl.style.display="block";monthSection.style.display="none";
-
-  const results=[];
-  for(const m of MONTHS){
-    for(const fam of(cache[m.name]||[])){
-      if((fam.familyType||"Unknown")===type)results.push({fam,matched:(fam.members||[]).find(mm=>mm.id===fam.headId)||{id:fam.headId,name:fam.headName,photoUrl:fam.headPhotoUrl||""}});
-    }
-  }
-  document.getElementById("search-count").textContent=`📋 ${type}: ${results.length} family(ies) found across all months`;
-  renderResultCards(results);
+  performSearch("");
 };
 
 // ── SEARCH (debounced — only runs ~280ms after typing pauses, so the
 // keyboard never freezes while results are being built) ──
 let searchDebounceTimer=null;
+let activeCategoryFilter=null;
 window.handleSearch=function(query){
-  document.querySelectorAll(".category-chip").forEach(c=>c.classList.remove("active-chip"));
+  if(!activeCategoryFilter){
+    document.querySelectorAll(".category-chip").forEach(c=>c.classList.remove("active-chip"));
+  }
   const resultsEl=document.getElementById("search-results");
   const monthSection=document.getElementById("month-grid-section");
   if(searchDebounceTimer){clearTimeout(searchDebounceTimer);searchDebounceTimer=null;}
-  if(!query.trim()){resultsEl.style.display="none";monthSection.style.display="";return;}
+  if(!query.trim()&&!activeCategoryFilter){resultsEl.style.display="none";monthSection.style.display="";return;}
   resultsEl.style.display="block";monthSection.style.display="none";
   document.getElementById("search-list").innerHTML='<div class="loading"><div class="spinner"></div> Searching...</div>';
   searchDebounceTimer=setTimeout(()=>performSearch(query),280);
 };
 
 window.performSearch=function(query){
-  const q=query.toLowerCase();const results=[];
+  const q=query.trim().toLowerCase();const results=[];
   for(const m of MONTHS){
     for(const fam of(cache[m.name]||[])){
+      if(activeCategoryFilter&&(fam.familyType||"Unknown")!==activeCategoryFilter)continue;
+      if(!q){
+        results.push({fam,matched:(fam.members||[]).find(mm=>mm.id===fam.headId)||{id:fam.headId,name:fam.headName,photoUrl:fam.headPhotoUrl||""}});
+        continue;
+      }
       let matched=null;
       if((fam.headName||"").toLowerCase().includes(q)||(fam.headId||"").includes(q)){
         matched=(fam.members||[]).find(mm=>mm.id===fam.headId)||{id:fam.headId,name:fam.headName,photoUrl:fam.headPhotoUrl||""};
@@ -1241,7 +1245,9 @@ window.performSearch=function(query){
       if(matched)results.push({fam,matched});
     }
   }
-  document.getElementById("search-count").textContent=`${results.length} result(s) found`;
+  document.getElementById("search-count").textContent=activeCategoryFilter
+    ? `📋 ${activeCategoryFilter}: ${results.length} family(ies) found across all months`
+    : `${results.length} result(s) found`;
   renderResultCards(results);
 };
 
