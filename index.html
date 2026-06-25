@@ -113,6 +113,10 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 
 .sync-bar { display: none; background: #ff9800; color: white; text-align: center; font-size: 12px; padding: 4px; }
 .sync-bar.show { display: block; }
+.photo-progress-bar { background: #1a3a6b; padding: 6px 12px; }
+.photo-progress-label { color: white; font-size: 12px; margin-bottom: 4px; }
+.photo-progress-track { background: rgba(255,255,255,0.25); border-radius: 4px; height: 6px; overflow: hidden; }
+.photo-progress-fill { background: #4ade80; height: 100%; border-radius: 4px; transition: width 0.2s ease; width: 0%; }
 
 .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 600; align-items: center; justify-content: center; padding: 20px; }
 .confirm-overlay.open { display: flex; }
@@ -183,6 +187,12 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
 
 <!-- Sync bar -->
 <div class="sync-bar" id="sync-bar">⏳ Saving in background...</div>
+
+<!-- Photo download progress bar -->
+<div class="photo-progress-bar" id="photo-progress-bar" style="display:none;">
+  <div class="photo-progress-label" id="photo-progress-label">📷 Loading photos 0 / 0</div>
+  <div class="photo-progress-track"><div class="photo-progress-fill" id="photo-progress-fill"></div></div>
+</div>
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
@@ -853,9 +863,6 @@ async function preloadAllData(){
     try{
       const snap=await getDocs(collection(db,"months",m.name,"families"));
       cache[m.name]=snap.docs.map(d=>({id:d.id,...d.data()}));
-      for(const fam of cache[m.name])
-        for(const mem of(fam.members||[]))
-          if(mem.photoUrl){const img=new Image();img.src=mem.photoUrl;}
       anyLoaded = true;
     }catch(e){ /* keep local cache for this month */ }
   }));
@@ -864,6 +871,49 @@ async function preloadAllData(){
     updateAllBadges();
     renderCategoryChips();
     showToast("✅ Data updated!");
+    downloadAllPhotos();
+  }
+}
+
+async function downloadAllPhotos(){
+  const urls=new Set();
+  for(const m of MONTHS){
+    for(const fam of(cache[m.name]||[])){
+      if(fam.headPhotoUrl)urls.add(fam.headPhotoUrl);
+      for(const mem of(fam.members||[]))
+        if(mem.photoUrl)urls.add(mem.photoUrl);
+    }
+  }
+  const list=[...urls];
+  if(!list.length)return;
+
+  const bar=document.getElementById("photo-progress-bar");
+  const label=document.getElementById("photo-progress-label");
+  const fill=document.getElementById("photo-progress-fill");
+  bar.style.display="block";
+  let done=0;
+  const total=list.length;
+
+  function updateBar(){
+    done++;
+    const pct=Math.round((done/total)*100);
+    fill.style.width=pct+"%";
+    label.textContent=`📷 Loading photos ${done} / ${total}`;
+    if(done>=total){
+      setTimeout(()=>{ bar.style.display="none"; },800);
+    }
+  }
+
+  // Download in batches of 8 so we don't flood the connection
+  const BATCH=8;
+  for(let i=0;i<list.length;i+=BATCH){
+    const chunk=list.slice(i,i+BATCH);
+    await Promise.all(chunk.map(url=>new Promise(resolve=>{
+      const img=new Image();
+      img.onload=()=>{ updateBar(); resolve(); };
+      img.onerror=()=>{ updateBar(); resolve(); };
+      img.src=url;
+    })));
   }
 }
 
