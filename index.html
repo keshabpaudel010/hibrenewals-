@@ -434,7 +434,7 @@ function adStringToBS(str){
   return `${bs.day} ${monthNep(bs.monthName)} ${bs.year}`;
 }
 
-let cache={},currentMonth=null,currentFamilies=[],currentFilter="all",currentDetailFam=null,confirmCallback=null,currentTypeFilter=null,monthViewState="types",monthSearchQuery="",monthSearchDebounceTimer=null;
+let cache={},currentMonth=null,currentFamilies=[],currentFilter="all",currentDetailFam=null,confirmCallback=null,currentTypeFilter=null,monthViewState="types",monthSearchQuery="",monthSearchDebounceTimer=null,detailOrigin="month";
 
 // ── TOAST ──
 function showToast(msg){
@@ -904,8 +904,8 @@ async function downloadAllPhotos(){
     }
   }
 
-  // Download in batches of 8 so we don't flood the connection
-  const BATCH=8;
+  // Download in batches of 30 concurrently
+  const BATCH=30;
   for(let i=0;i<list.length;i+=BATCH){
     const chunk=list.slice(i,i+BATCH);
     await Promise.all(chunk.map(url=>new Promise(resolve=>{
@@ -1069,7 +1069,8 @@ function renderMonthList(filter){
   }
 }
 
-function openDetail(fam){
+function openDetail(fam, origin){
+  detailOrigin=origin||"month";
   currentDetailFam=fam;
   document.getElementById("detail-title").textContent=fam.headName||"Family";
   const headMember=(fam.members||[]).find(m=>m.id===fam.headId)||(fam.members||[])[0];
@@ -1137,6 +1138,8 @@ function openDetail(fam){
   }else{
     historySection.innerHTML="";
   }
+  document.querySelector("#page-detail .back-btn").textContent=
+    detailOrigin==="search"?"← Back to Search Results":"← Back to List";
   showPage("page-detail");
 }
 
@@ -1318,7 +1321,7 @@ function renderResultCards(results){
         <div class="family-id">ID: ${matched.id||""}${!isHeadMatch?` · Member of "${fam.headName||""}"`:""} · ${monthNep(fam.nepaliMonth)}</div>
         <div class="family-info">${fam.memberCount||0} members</div>
       </div>`;
-    card.onclick=()=>openDetail(fam);
+    card.onclick=()=>openDetail(fam,"search");
     const checkEl=card.querySelector(".paid-check");
     checkEl.onclick=(e)=>{e.stopPropagation();handlePaidClick(fam,checkEl);};
 
@@ -1359,7 +1362,13 @@ window.filterCards=function(filter,el){
 
 function showPage(id){document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));document.getElementById(id).classList.add("active");}
 window.goHome=function(){showPage("page-home");};
-window.goMonth=function(){showPage("page-month");};
+window.goMonth=function(){
+  if(detailOrigin==="search"){
+    showPage("page-home");
+  }else{
+    showPage("page-month");
+  }
+};
 
 window.openPhoto=function(url,name,role){
   document.getElementById("photo-modal-img").src=url;
