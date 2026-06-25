@@ -261,7 +261,15 @@ body { font-family: sans-serif; background: #f5f5f5; color: #222; max-width: 480
     <div class="category-chips" id="category-chips"></div>
   </div>
   <div id="search-results" style="display:none; padding:10px 12px;">
-    <div style="font-size:13px;color:#555;margin-bottom:8px;" id="search-count"></div>
+    <div style="font-size:13px;color:#555;margin-bottom:6px;" id="search-count"></div>
+    <div id="result-filter-bar">
+      <div class="filter-tabs" style="padding:0 0 4px;">
+        <div class="tab active" id="rf-all" onclick="setResultFilter('all',this)">All</div>
+        <div class="tab" id="rf-paid" onclick="setResultFilter('paid',this)">✅ Paid</div>
+        <div class="tab" id="rf-unpaid" onclick="setResultFilter('unpaid',this)">❌ Unpaid</div>
+      </div>
+      <div id="result-month-chips" style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:8px;"></div>
+    </div>
     <div id="search-list" class="family-list" style="padding:0;"></div>
   </div>
   <div id="month-grid-section">
@@ -523,7 +531,7 @@ async function permanentlyDeleteFamily(fam){
     showSyncBar(false);
     showToast("🗑️ Family permanently deleted");
     if(document.getElementById("search-results").style.display==="block"){
-      performSearch(document.getElementById("search-input").value);
+      applyResultFilters();
     }else{
       renderTypeGrid();
       if(monthViewState==="list")renderMonthList(currentFilter);
@@ -560,7 +568,7 @@ async function toggleIgnoreFamily(fam){
     showSyncBar(false);
     showToast(newIgnored?"🙈 Family ignored":"↩️ Family restored");
     if(document.getElementById("search-results").style.display==="block"){
-      performSearch(document.getElementById("search-input").value);
+      applyResultFilters();
     }else{
       renderMonthList(currentFilter);
     }
@@ -619,7 +627,7 @@ async function moveFamilyToMonth(fam,newMonth){
     showSyncBar(false);
     showToast(`✅ Moved to ${monthNep(newMonth)}`);
     if(document.getElementById("search-results").style.display==="block"){
-      performSearch(document.getElementById("search-input").value);
+      applyResultFilters();
     }else if(currentMonth&&currentMonth.name===oldMonth){
       renderTypeGrid();
       if(monthViewState==="list")renderMonthList(currentFilter);
@@ -1186,7 +1194,7 @@ async function doTogglePaid(fam,checkEl){
       saveToLocal();
     }
     if(document.getElementById("search-results").style.display==="block"){
-      performSearch(document.getElementById("search-input").value);
+      applyResultFilters();
     }else{
       renderMonthList(currentFilter);
     }
@@ -1215,6 +1223,9 @@ window.closeSearchResults=function(){
   document.getElementById("search-input").placeholder="Search...";
   document.querySelectorAll(".category-chip").forEach(c=>c.classList.remove("active-chip"));
   activeCategoryFilter=null;
+  resultFilter="all";
+  resultMonthFilter=null;
+  lastResults=[];
   if(searchDebounceTimer){clearTimeout(searchDebounceTimer);searchDebounceTimer=null;}
   document.getElementById("search-results").style.display="none";
   document.getElementById("month-grid-section").style.display="";
@@ -1266,6 +1277,9 @@ window.browseCategory=function(type,chipEl){
 // keyboard never freezes while results are being built) ──
 let searchDebounceTimer=null;
 let activeCategoryFilter=null;
+let lastResults=[];
+let resultFilter="all";
+let resultMonthFilter=null;
 window.handleSearch=function(query){
   if(!activeCategoryFilter){
     document.querySelectorAll(".category-chip").forEach(c=>c.classList.remove("active-chip"));
@@ -1298,11 +1312,64 @@ window.performSearch=function(query){
       if(matched)results.push({fam,matched});
     }
   }
-  document.getElementById("search-count").textContent=activeCategoryFilter
-    ? `📋 ${activeCategoryFilter}: ${results.length} family(ies) found across all months`
-    : `${results.length} result(s) found`;
-  renderResultCards(results);
+  lastResults=results;
+  resultFilter="all";
+  resultMonthFilter=null;
+  document.querySelectorAll("#result-filter-bar .tab").forEach(t=>t.classList.remove("active"));
+  document.getElementById("rf-all").classList.add("active");
+  buildResultMonthChips(results);
+  applyResultFilters();
 };
+
+window.setResultFilter=function(f,el){
+  resultFilter=f;
+  document.querySelectorAll("#result-filter-bar .tab").forEach(t=>t.classList.remove("active"));
+  el.classList.add("active");
+  applyResultFilters();
+};
+
+window.setResultMonth=function(month,chipEl){
+  if(resultMonthFilter===month){
+    resultMonthFilter=null;
+    document.querySelectorAll(".result-month-chip").forEach(c=>c.classList.remove("active-chip"));
+  }else{
+    resultMonthFilter=month;
+    document.querySelectorAll(".result-month-chip").forEach(c=>c.classList.remove("active-chip"));
+    if(chipEl)chipEl.classList.add("active-chip");
+  }
+  applyResultFilters();
+};
+
+function buildResultMonthChips(results){
+  const monthsInResults=new Set(results.map(r=>r.fam.nepaliMonth).filter(Boolean));
+  const wrap=document.getElementById("result-month-chips");
+  wrap.innerHTML="";
+  if(monthsInResults.size<=1){wrap.style.display="none";return;}
+  wrap.style.display="flex";
+  for(const m of MONTHS){
+    if(!monthsInResults.has(m.name))continue;
+    const chip=document.createElement("div");
+    chip.className="category-chip result-month-chip";
+    chip.style.fontSize="12px";chip.style.padding="4px 10px";
+    chip.textContent=m.nep;
+    chip.onclick=()=>setResultMonth(m.name,chip);
+    wrap.appendChild(chip);
+  }
+}
+
+function applyResultFilters(){
+  let filtered=lastResults;
+  if(resultMonthFilter)filtered=filtered.filter(r=>r.fam.nepaliMonth===resultMonthFilter);
+  if(resultFilter==="paid")filtered=filtered.filter(r=>r.fam.paid);
+  if(resultFilter==="unpaid")filtered=filtered.filter(r=>!r.fam.paid);
+  const total=lastResults.length;
+  const label=activeCategoryFilter
+    ? `📋 ${activeCategoryFilter}: ${total} total · showing ${filtered.length}`
+    : `${total} result(s) found · showing ${filtered.length}`;
+  document.getElementById("search-count").textContent=label;
+  renderResultCards(filtered);
+}
+
 
 function renderResultCards(results){
   const listEl=document.getElementById("search-list");listEl.innerHTML="";
