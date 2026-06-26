@@ -1183,6 +1183,17 @@ async function doTogglePaid(fam,checkEl){
       const newFamObj={...updatedFam,id:fam.headId};
       cache[currentNepaliMonth].push(newFamObj);
       if(currentDetailFam&&currentDetailFam.headId===fam.headId)currentDetailFam=newFamObj;
+      // Update lastResults so applyResultFilters shows the correct tick
+      const lrIdx=lastResults.findIndex(r=>r.fam.headId===fam.headId);
+      if(lrIdx!==-1)lastResults[lrIdx]={...lastResults[lrIdx],fam:newFamObj};
+      // Also update the visible card immediately so mom doesn't see an unticked card
+      if(checkEl){
+        checkEl.classList.remove("saving");
+        checkEl.classList.add("checked");
+        checkEl.textContent="✓";
+        const card=checkEl.closest(".family-card");
+        if(card){card.classList.remove("unpaid");card.classList.add("paid");}
+      }
       updateMonthBadge(oldMonth);updateMonthBadge(currentNepaliMonth);
       saveToLocal();
     }else{
